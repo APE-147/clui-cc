@@ -26,6 +26,7 @@ let toggleSequence = 0
 let savedWindowPlacement = null as ReturnType<typeof loadSavedWindowPlacement>
 let persistWindowPlacementTimer: NodeJS.Timeout | null = null
 let repositionModeActive = false
+let repositionDragState: { pointerX: number; pointerY: number; windowX: number; windowY: number } | null = null
 
 // Feature flag: enable PTY interactive permissions transport
 const INTERACTIVE_PTY = process.env.CLUI_INTERACTIVE_PERMISSIONS_PTY === '1'
@@ -91,6 +92,7 @@ function scheduleWindowPlacementPersist(): void {
 function setRepositionModeActive(active: boolean): void {
   if (repositionModeActive === active) return
   repositionModeActive = active
+  if (!active) repositionDragState = null
   broadcast(IPC.REPOSITION_MODE_CHANGED, active)
 }
 
@@ -201,6 +203,55 @@ function createWindow(): void {
     }
     if (input.type === 'keyUp') {
       setRepositionModeActive(false)
+    }
+  })
+  mainWindow.webContents.on('before-mouse-event', (event, mouse) => {
+    if (!mainWindow || !mainWindow.isVisible()) return
+
+    const modifiers = Array.isArray((mouse as any).modifiers) ? ((mouse as any).modifiers as string[]) : []
+    const hasShift = modifiers.includes('shift')
+    const globalX = typeof (mouse as any).globalX === 'number' ? ((mouse as any).globalX as number) : null
+    const globalY = typeof (mouse as any).globalY === 'number' ? ((mouse as any).globalY as number) : null
+
+    if (hasShift && (mouse.type === 'mouseMove' || mouse.type === 'mouseDown')) {
+      setRepositionModeActive(true)
+    } else if (!hasShift && !repositionDragState && mouse.type === 'mouseMove') {
+      setRepositionModeActive(false)
+    }
+
+    if (
+      hasShift &&
+      mouse.type === 'mouseDown' &&
+      mouse.button === 'left' &&
+      globalX != null &&
+      globalY != null
+    ) {
+      const bounds = mainWindow.getBounds()
+      repositionDragState = {
+        pointerX: globalX,
+        pointerY: globalY,
+        windowX: bounds.x,
+        windowY: bounds.y,
+      }
+      mainWindow.setIgnoreMouseEvents(false)
+      event.preventDefault()
+      return
+    }
+
+    if (repositionDragState && mouse.type === 'mouseMove' && globalX != null && globalY != null) {
+      const nextX = repositionDragState.windowX + (globalX - repositionDragState.pointerX)
+      const nextY = repositionDragState.windowY + (globalY - repositionDragState.pointerY)
+      const next = clampWindowPosition(mainWindow, nextX, nextY)
+      mainWindow.setPosition(next.x, next.y, false)
+      event.preventDefault()
+      return
+    }
+
+    if (repositionDragState && (mouse.type === 'mouseUp' || !hasShift)) {
+      repositionDragState = null
+      if (!hasShift || mouse.type === 'mouseUp') {
+        setRepositionModeActive(hasShift)
+      }
     }
   })
 

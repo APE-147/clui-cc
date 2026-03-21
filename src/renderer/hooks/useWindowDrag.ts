@@ -1,12 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
-
-type DragState = {
-  pointerScreenX: number
-  pointerScreenY: number
-  windowX: number
-  windowY: number
-}
 
 function updateDragMarker(active: boolean): void {
   document.documentElement.dataset.windowDragging = active ? 'true' : 'false'
@@ -15,36 +8,15 @@ function updateDragMarker(active: boolean): void {
 
 export function useWindowDrag() {
   const [isRepositionMode, setIsRepositionMode] = useState(false)
-  const dragStateRef = useRef<DragState | null>(null)
-  const pointerRef = useRef<{ clientX: number; clientY: number } | null>(null)
-
-  const syncIgnoreMouseEvents = useCallback((point?: { clientX: number; clientY: number } | null) => {
-    const element = point ? document.elementFromPoint(point.clientX, point.clientY) : null
-    const isUi = !!(element && element.closest('[data-clui-ui]'))
-    if (isUi) {
-      window.clui.setIgnoreMouseEvents(false)
-      return
-    }
-    window.clui.setIgnoreMouseEvents(true, { forward: true })
-  }, [])
 
   const updateBodyCursor = useCallback((nextDragging: boolean, nextMode: boolean) => {
     document.body.style.cursor = nextDragging ? 'grabbing' : nextMode ? 'grab' : ''
   }, [])
 
-  const stopDragging = useCallback((point?: { clientX: number; clientY: number } | null) => {
-    if (!dragStateRef.current && document.documentElement.dataset.windowDragging !== 'true') return
-    dragStateRef.current = null
-    updateDragMarker(false)
-    updateBodyCursor(false, document.documentElement.dataset.windowRepositionMode === 'true')
-    if (document.documentElement.dataset.windowRepositionMode !== 'true') {
-      syncIgnoreMouseEvents(point ?? pointerRef.current)
-    }
-  }, [syncIgnoreMouseEvents, updateBodyCursor])
-
   const setRepositionMode = useCallback((active: boolean) => {
     document.documentElement.dataset.windowRepositionMode = active ? 'true' : 'false'
     setIsRepositionMode(active)
+    updateDragMarker(false)
     updateBodyCursor(false, active)
 
     if (active) {
@@ -52,43 +24,21 @@ export function useWindowDrag() {
       return
     }
 
-    stopDragging(pointerRef.current)
-    syncIgnoreMouseEvents(pointerRef.current)
-  }, [stopDragging, syncIgnoreMouseEvents, updateBodyCursor])
+    window.clui.setIgnoreMouseEvents(true, { forward: true })
+  }, [updateBodyCursor])
 
   useEffect(() => {
-    const handleMouseMove = (event: MouseEvent) => {
-      pointerRef.current = { clientX: event.clientX, clientY: event.clientY }
-      const hoveredElement = document.elementFromPoint(event.clientX, event.clientY)
-      const hoveringUi = !!(hoveredElement && hoveredElement.closest('[data-clui-ui]'))
-
-      if (!dragStateRef.current) {
-        if (event.shiftKey && hoveringUi) {
-          if (document.documentElement.dataset.windowRepositionMode !== 'true') {
-            setRepositionMode(true)
-          }
-        } else if (document.documentElement.dataset.windowRepositionMode === 'true') {
-          setRepositionMode(false)
-        }
+    const handleMouseUp = () => {
+      if (document.documentElement.dataset.windowRepositionMode === 'true') {
+        updateDragMarker(false)
+        updateBodyCursor(false, true)
       }
-
-      const dragState = dragStateRef.current
-      if (!dragState) return
-
-      const nextX = dragState.windowX + (event.screenX - dragState.pointerScreenX)
-      const nextY = dragState.windowY + (event.screenY - dragState.pointerScreenY)
-      window.clui.setWindowPosition(nextX, nextY)
-    }
-
-    const handleMouseUp = (event: MouseEvent) => {
-      stopDragging({ clientX: event.clientX, clientY: event.clientY })
     }
 
     const handleWindowBlur = () => {
       setRepositionMode(false)
     }
 
-    window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('mouseup', handleMouseUp)
     window.addEventListener('blur', handleWindowBlur)
     const unsubRepositionMode = window.clui.onRepositionModeChange((active) => {
@@ -96,42 +46,28 @@ export function useWindowDrag() {
     })
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
       window.removeEventListener('blur', handleWindowBlur)
       unsubRepositionMode()
     }
-  }, [setRepositionMode, stopDragging])
+  }, [setRepositionMode, updateBodyCursor])
 
   useEffect(() => () => {
     document.documentElement.dataset.windowRepositionMode = 'false'
     updateDragMarker(false)
     updateBodyCursor(false, false)
-  }, [])
+  }, [updateBodyCursor])
 
-  const handleMouseDown = useCallback(async (event: ReactMouseEvent<HTMLElement>) => {
+  const handleMouseDown = useCallback((event: ReactMouseEvent<HTMLElement>) => {
     if (event.button !== 0) return
-    if (event.shiftKey && document.documentElement.dataset.windowRepositionMode !== 'true') {
-      setRepositionMode(true)
-    }
     if (document.documentElement.dataset.windowRepositionMode !== 'true') return
-
-    const bounds = await window.clui.getWindowBounds()
-    if (!bounds) return
-
-    dragStateRef.current = {
-      pointerScreenX: event.screenX,
-      pointerScreenY: event.screenY,
-      windowX: bounds.x,
-      windowY: bounds.y,
-    }
 
     updateDragMarker(true)
     updateBodyCursor(true, true)
     window.clui.setIgnoreMouseEvents(false)
     event.preventDefault()
     event.stopPropagation()
-  }, [setRepositionMode, updateBodyCursor])
+  }, [updateBodyCursor])
 
   return {
     isRepositionMode,

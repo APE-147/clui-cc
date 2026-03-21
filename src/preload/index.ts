@@ -40,8 +40,10 @@ export interface CluiAPI {
   animateHeight(from: number, to: number, durationMs: number): Promise<void>
   hideWindow(): void
   isVisible(): Promise<boolean>
+  getWindowBounds(): Promise<{ x: number; y: number; width: number; height: number } | null>
   /** OS-level click-through for transparent window regions */
   setIgnoreMouseEvents(ignore: boolean, options?: { forward?: boolean }): void
+  setWindowPosition(x: number, y: number): void
 
   // ─── Event listeners (main → renderer) ───
   onEvent(callback: (tabId: string, event: NormalizedEvent) => void): () => void
@@ -96,9 +98,11 @@ const api: CluiAPI = {
     ipcRenderer.invoke(IPC.ANIMATE_HEIGHT, { from, to, durationMs }),
   hideWindow: () => ipcRenderer.send(IPC.HIDE_WINDOW),
   isVisible: () => ipcRenderer.invoke(IPC.IS_VISIBLE),
+  getWindowBounds: () => ipcRenderer.invoke(IPC.GET_WINDOW_BOUNDS),
   setIgnoreMouseEvents: (ignore, options) =>
     ipcRenderer.send(IPC.SET_IGNORE_MOUSE_EVENTS, ignore, options || {}),
   setWindowWidth: (width) => ipcRenderer.send(IPC.SET_WINDOW_WIDTH, width),
+  setWindowPosition: (x, y) => ipcRenderer.send(IPC.SET_WINDOW_POSITION, { x, y }),
 
   // ─── Event listeners ───
   onEvent: (callback) => {

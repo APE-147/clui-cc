@@ -9,6 +9,7 @@ import { MarketplacePanel } from './components/MarketplacePanel'
 import { PopoverLayerProvider } from './components/PopoverLayer'
 import { useClaudeEvents } from './hooks/useClaudeEvents'
 import { useHealthReconciliation } from './hooks/useHealthReconciliation'
+import { useWindowDrag } from './hooks/useWindowDrag'
 import { getResponsiveLayoutMetrics, useViewportSize } from './layout'
 import { useSessionStore } from './stores/sessionStore'
 import { useColors, useThemeStore } from './theme'
@@ -65,6 +66,14 @@ export default function App() {
     let lastIgnored: boolean | null = null
 
     const onMouseMove = (e: MouseEvent) => {
+      if (document.documentElement.dataset.windowDragging === 'true') {
+        if (lastIgnored !== false) {
+          lastIgnored = false
+          window.clui.setIgnoreMouseEvents(false)
+        }
+        return
+      }
+
       const el = document.elementFromPoint(e.clientX, e.clientY)
       const isUI = !!(el && el.closest('[data-clui-ui]'))
       const shouldIgnore = !isUI
@@ -79,6 +88,7 @@ export default function App() {
     }
 
     const onMouseLeave = () => {
+      if (document.documentElement.dataset.windowDragging === 'true') return
       if (lastIgnored !== true) {
         lastIgnored = true
         window.clui.setIgnoreMouseEvents(true, { forward: true })
@@ -97,6 +107,7 @@ export default function App() {
   const marketplaceOpen = useSessionStore((s) => s.marketplaceOpen)
   const isRunning = activeTabStatus === 'running' || activeTabStatus === 'connecting'
   const viewport = useViewportSize()
+  const windowDrag = useWindowDrag()
 
   // Layout dimensions scale with the native window size instead of fixed pixels.
   const baseLayout = getResponsiveLayoutMetrics(viewport.width, viewport.height, expandedUI)
@@ -148,7 +159,7 @@ export default function App() {
                 >
                   <div
                     data-clui-ui
-                    className="glass-surface overflow-hidden no-drag"
+                    className="glass-surface overflow-hidden"
                     style={{
                       borderRadius: 24,
                       maxHeight: layout.marketplaceHeight,
@@ -168,7 +179,7 @@ export default function App() {
           */}
           <motion.div
             data-clui-ui
-            className="overflow-hidden flex flex-col drag-region"
+            className="overflow-hidden flex flex-col"
             animate={{
               width: isExpanded ? layout.cardExpandedWidth : layout.cardCollapsedWidth,
               marginBottom: isExpanded ? 10 : -14,
@@ -186,6 +197,7 @@ export default function App() {
               position: 'relative',
               zIndex: isExpanded ? 20 : 10,
             }}
+            {...windowDrag}
           >
             {/* Tab strip — always mounted */}
             <div>
@@ -200,7 +212,7 @@ export default function App() {
                 opacity: isExpanded ? 1 : 0,
               }}
               transition={TRANSITION}
-              className="overflow-hidden no-drag"
+              className="overflow-hidden"
             >
               <div style={{ maxHeight: layout.bodyMaxHeight }}>
                 <ConversationView maxHeight={layout.conversationMaxHeight} />

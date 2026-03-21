@@ -196,10 +196,6 @@ input::placeholder {
 .btn-stack:hover .stack-btn-2 { right: 56px; }
 .btn-stack:hover .stack-btn-3 { right: 112px; }
 
-/* ─── Drag region for frameless window ─── */
-.drag-region {
-  -webkit-app-region: drag;
-}
+/* ─── Semantic opt-out marker for custom JS window dragging ─── */
 .no-drag {
-  -webkit-app-region: no-drag;
 }

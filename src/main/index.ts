@@ -87,6 +87,24 @@ function scheduleWindowPlacementPersist(): void {
   }, 120)
 }
 
+function clampWindowPosition(win: BrowserWindow, x: number, y: number): { x: number; y: number } {
+  const currentBounds = win.getBounds()
+  const targetBounds = {
+    x: Math.round(x),
+    y: Math.round(y),
+    width: currentBounds.width,
+    height: currentBounds.height,
+  }
+  const display = screen.getDisplayMatching(targetBounds)
+  const maxX = display.workArea.x + Math.max(0, display.workArea.width - currentBounds.width)
+  const maxY = display.workArea.y + Math.max(0, display.workArea.height - currentBounds.height)
+
+  return {
+    x: Math.min(Math.max(targetBounds.x, display.workArea.x), maxX),
+    y: Math.min(Math.max(targetBounds.y, display.workArea.y), maxY),
+  }
+}
+
 
 // ─── Wire ControlPlane events → renderer ───
 
@@ -231,6 +249,12 @@ ipcMain.handle(IPC.IS_VISIBLE, () => {
   return mainWindow?.isVisible() ?? false
 })
 
+ipcMain.handle(IPC.GET_WINDOW_BOUNDS, (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (!win || win.isDestroyed()) return null
+  return win.getBounds()
+})
+
 // OS-level click-through toggle — renderer calls this on mousemove
 // to enable clicks on interactive UI while passing through transparent areas
 ipcMain.on(IPC.SET_IGNORE_MOUSE_EVENTS, (event, ignore: boolean, options?: { forward?: boolean }) => {
@@ -238,6 +262,15 @@ ipcMain.on(IPC.SET_IGNORE_MOUSE_EVENTS, (event, ignore: boolean, options?: { for
   if (win && !win.isDestroyed()) {
     win.setIgnoreMouseEvents(ignore, options || {})
   }
+})
+
+ipcMain.on(IPC.SET_WINDOW_POSITION, (event, position: { x: number; y: number }) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (!win || win.isDestroyed()) return
+  if (!Number.isFinite(position?.x) || !Number.isFinite(position?.y)) return
+
+  const next = clampWindowPosition(win, position.x, position.y)
+  win.setPosition(next.x, next.y, false)
 })
 
 // ─── IPC Handlers (typed, strict) ───

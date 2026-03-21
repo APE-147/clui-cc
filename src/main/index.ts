@@ -25,6 +25,7 @@ let screenshotCounter = 0
 let toggleSequence = 0
 let savedWindowPlacement = null as ReturnType<typeof loadSavedWindowPlacement>
 let persistWindowPlacementTimer: NodeJS.Timeout | null = null
+let repositionModeActive = false
 
 // Feature flag: enable PTY interactive permissions transport
 const INTERACTIVE_PTY = process.env.CLUI_INTERACTIVE_PERMISSIONS_PTY === '1'
@@ -85,6 +86,12 @@ function scheduleWindowPlacementPersist(): void {
   persistWindowPlacementTimer = setTimeout(() => {
     persistCurrentWindowPlacement()
   }, 120)
+}
+
+function setRepositionModeActive(active: boolean): void {
+  if (repositionModeActive === active) return
+  repositionModeActive = active
+  broadcast(IPC.REPOSITION_MODE_CHANGED, active)
 }
 
 function clampWindowPosition(win: BrowserWindow, x: number, y: number): { x: number; y: number } {
@@ -171,12 +178,31 @@ function createWindow(): void {
   mainWindow.on('close', (e) => {
     if (!forceQuit) {
       e.preventDefault()
+      setRepositionModeActive(false)
       persistCurrentWindowPlacement()
       mainWindow?.hide()
     }
   })
+  mainWindow.on('hide', () => {
+    setRepositionModeActive(false)
+  })
+  mainWindow.on('blur', () => {
+    setRepositionModeActive(false)
+  })
   mainWindow.on('move', scheduleWindowPlacementPersist)
   mainWindow.on('moved', scheduleWindowPlacementPersist)
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (!mainWindow || !mainWindow.isVisible()) return
+    if (input.key !== 'Shift') return
+
+    if (input.type === 'keyDown') {
+      setRepositionModeActive(true)
+      return
+    }
+    if (input.type === 'keyUp') {
+      setRepositionModeActive(false)
+    }
+  })
 
   if (process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -188,6 +214,7 @@ function createWindow(): void {
 function showWindow(source = 'unknown'): void {
   if (!mainWindow) return
   const toggleId = ++toggleSequence
+  setRepositionModeActive(false)
 
   const display = resolvePlacementDisplay(savedWindowPlacement)
   mainWindow.setBounds(resolveWindowBounds(display, savedWindowPlacement))
@@ -242,6 +269,7 @@ ipcMain.handle(IPC.ANIMATE_HEIGHT, () => {
 })
 
 ipcMain.on(IPC.HIDE_WINDOW, () => {
+  setRepositionModeActive(false)
   mainWindow?.hide()
 })
 

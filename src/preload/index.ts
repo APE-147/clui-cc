@@ -51,6 +51,7 @@ export interface CluiAPI {
   onError(callback: (tabId: string, error: EnrichedError) => void): () => void
   onSkillStatus(callback: (status: { name: string; state: string; error?: string; reason?: string }) => void): () => void
   onWindowShown(callback: () => void): () => void
+  onRepositionModeChange(callback: (active: boolean) => void): () => void
 }
 
 const api: CluiAPI = {
@@ -141,6 +142,12 @@ const api: CluiAPI = {
     const handler = () => callback()
     ipcRenderer.on(IPC.WINDOW_SHOWN, handler)
     return () => ipcRenderer.removeListener(IPC.WINDOW_SHOWN, handler)
+  },
+
+  onRepositionModeChange: (callback) => {
+    const handler = (_e: Electron.IpcRendererEvent, active: boolean) => callback(active)
+    ipcRenderer.on(IPC.REPOSITION_MODE_CHANGED, handler)
+    return () => ipcRenderer.removeListener(IPC.REPOSITION_MODE_CHANGED, handler)
   },
 }
 

@@ -76,30 +76,18 @@ export function useWindowDrag() {
       setRepositionMode(false)
     }
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Shift') return
-      if (!document.hasFocus()) return
-      if (document.documentElement.dataset.windowRepositionMode === 'true') return
-      setRepositionMode(true)
-    }
-
-    const handleKeyUp = (event: KeyboardEvent) => {
-      if (event.key !== 'Shift') return
-      setRepositionMode(false)
-    }
-
     window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('mouseup', handleMouseUp)
     window.addEventListener('blur', handleWindowBlur)
-    window.addEventListener('keydown', handleKeyDown, true)
-    window.addEventListener('keyup', handleKeyUp, true)
+    const unsubRepositionMode = window.clui.onRepositionModeChange((active) => {
+      setRepositionMode(active)
+    })
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
       window.removeEventListener('blur', handleWindowBlur)
-      window.removeEventListener('keydown', handleKeyDown, true)
-      window.removeEventListener('keyup', handleKeyUp, true)
+      unsubRepositionMode()
     }
   }, [setRepositionMode, stopDragging])
 

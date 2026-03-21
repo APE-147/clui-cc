@@ -343,6 +343,7 @@ export const IPC = {
   IS_VISIBLE: 'clui:is-visible',
   GET_WINDOW_BOUNDS: 'clui:get-window-bounds',
   SET_WINDOW_POSITION: 'clui:set-window-position',
+  REPOSITION_MODE_CHANGED: 'clui:reposition-mode-changed',
 
   // Skill provisioning (main → renderer)
   SKILL_STATUS: 'clui:skill-status',

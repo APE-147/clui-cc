@@ -8,6 +8,7 @@ import { ensureSkills, type SkillStatus } from './skills/installer'
 import { fetchCatalog, listInstalled, installPlugin, uninstallPlugin } from './marketplace/catalog'
 import { log as _log, LOG_FILE, flushLogs } from './logger'
 import { getCliEnv } from './cli-env'
+import { loadSavedWindowPlacement, placementFromBounds, resolvePlacementDisplay, resolveWindowBounds, saveWindowPlacement } from './window-layout'
 import { IPC } from '../shared/types'
 import type { RunOptions, NormalizedEvent, EnrichedError } from '../shared/types'
 
@@ -22,17 +23,13 @@ let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let screenshotCounter = 0
 let toggleSequence = 0
+let savedWindowPlacement = null as ReturnType<typeof loadSavedWindowPlacement>
+let persistWindowPlacementTimer: NodeJS.Timeout | null = null
 
 // Feature flag: enable PTY interactive permissions transport
 const INTERACTIVE_PTY = process.env.CLUI_INTERACTIVE_PERMISSIONS_PTY === '1'
 
 const controlPlane = new ControlPlane(INTERACTIVE_PTY)
-
-// Keep native width fixed to avoid renderer animation vs setBounds race.
-// Daily-use defaults: wider canvas, a bit more vertical room, and a higher resting position.
-const BAR_WIDTH = 1180
-const PILL_HEIGHT = 780  // Fixed native window height — extra room for expanded UI + shadow buffers
-const PILL_BOTTOM_MARGIN = 48
 
 // ─── Broadcast to renderer ───
 
@@ -75,6 +72,21 @@ function scheduleToggleSnapshots(toggleId: number, phase: 'show' | 'hide'): void
   }
 }
 
+function persistCurrentWindowPlacement(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  savedWindowPlacement = placementFromBounds(mainWindow.getBounds())
+  if (savedWindowPlacement) {
+    saveWindowPlacement(savedWindowPlacement)
+  }
+}
+
+function scheduleWindowPlacementPersist(): void {
+  if (persistWindowPlacementTimer) clearTimeout(persistWindowPlacementTimer)
+  persistWindowPlacementTimer = setTimeout(() => {
+    persistCurrentWindowPlacement()
+  }, 120)
+}
+
 
 // ─── Wire ControlPlane events → renderer ───
 
@@ -93,19 +105,14 @@ controlPlane.on('error', (tabId: string, error: EnrichedError) => {
 // ─── Window Creation ───
 
 function createWindow(): void {
-  const cursor = screen.getCursorScreenPoint()
-  const display = screen.getDisplayNearestPoint(cursor)
-  const { width: screenWidth, height: screenHeight } = display.workAreaSize
-  const { x: dx, y: dy } = display.workArea
-
-  const x = dx + Math.round((screenWidth - BAR_WIDTH) / 2)
-  const y = dy + screenHeight - PILL_HEIGHT - PILL_BOTTOM_MARGIN
+  const display = resolvePlacementDisplay(savedWindowPlacement)
+  const bounds = resolveWindowBounds(display, savedWindowPlacement)
 
   mainWindow = new BrowserWindow({
-    width: BAR_WIDTH,
-    height: PILL_HEIGHT,
-    x,
-    y,
+    width: bounds.width,
+    height: bounds.height,
+    x: bounds.x,
+    y: bounds.y,
     ...(process.platform === 'darwin' ? { type: 'panel' as const } : {}),  // NSPanel — non-activating, joins all spaces
     frame: false,
     transparent: true,
@@ -146,9 +153,12 @@ function createWindow(): void {
   mainWindow.on('close', (e) => {
     if (!forceQuit) {
       e.preventDefault()
+      persistCurrentWindowPlacement()
       mainWindow?.hide()
     }
   })
+  mainWindow.on('move', scheduleWindowPlacementPersist)
+  mainWindow.on('moved', scheduleWindowPlacementPersist)
 
   if (process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -161,17 +171,8 @@ function showWindow(source = 'unknown'): void {
   if (!mainWindow) return
   const toggleId = ++toggleSequence
 
-  // Position on the display where the cursor currently is (not always primary)
-  const cursor = screen.getCursorScreenPoint()
-  const display = screen.getDisplayNearestPoint(cursor)
-  const { width: sw, height: sh } = display.workAreaSize
-  const { x: dx, y: dy } = display.workArea
-  mainWindow.setBounds({
-    x: dx + Math.round((sw - BAR_WIDTH) / 2),
-    y: dy + sh - PILL_HEIGHT - PILL_BOTTOM_MARGIN,
-    width: BAR_WIDTH,
-    height: PILL_HEIGHT,
-  })
+  const display = resolvePlacementDisplay(savedWindowPlacement)
+  mainWindow.setBounds(resolveWindowBounds(display, savedWindowPlacement))
 
   // Always re-assert space membership — the flag can be lost after hide/show cycles
   // and must be set before show() so the window joins the active Space, not its
@@ -1032,6 +1033,7 @@ app.whenReady().then(async () => {
     broadcast(IPC.SKILL_STATUS, status)
   }).catch((err: Error) => log(`Skill provisioning error: ${err.message}`))
 
+  savedWindowPlacement = loadSavedWindowPlacement()
   createWindow()
   snapshotWindowState('after createWindow')
 

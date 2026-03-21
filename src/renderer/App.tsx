@@ -66,7 +66,10 @@ export default function App() {
     let lastIgnored: boolean | null = null
 
     const onMouseMove = (e: MouseEvent) => {
-      if (document.documentElement.dataset.windowDragging === 'true') {
+      if (
+        document.documentElement.dataset.windowDragging === 'true' ||
+        document.documentElement.dataset.windowRepositionMode === 'true'
+      ) {
         if (lastIgnored !== false) {
           lastIgnored = false
           window.clui.setIgnoreMouseEvents(false)
@@ -88,7 +91,10 @@ export default function App() {
     }
 
     const onMouseLeave = () => {
-      if (document.documentElement.dataset.windowDragging === 'true') return
+      if (
+        document.documentElement.dataset.windowDragging === 'true' ||
+        document.documentElement.dataset.windowRepositionMode === 'true'
+      ) return
       if (lastIgnored !== true) {
         lastIgnored = true
         window.clui.setIgnoreMouseEvents(true, { forward: true })
@@ -136,6 +142,40 @@ export default function App() {
 
         {/* ─── Responsive content column, centered. Circles overflow left. ─── */}
         <div style={{ width: layout.contentWidth, position: 'relative', margin: '0 auto', transition: 'width 0.26s cubic-bezier(0.4, 0, 0.1, 1)' }}>
+
+          {windowDrag.isRepositionMode && (
+            <div
+              data-clui-ui
+              onMouseDown={windowDrag.onMouseDown}
+              style={{
+                position: 'absolute',
+                inset: -10,
+                borderRadius: 30,
+                border: `2px dashed ${colors.accent}`,
+                background: colors.accentSoft,
+                boxShadow: `0 0 0 1px ${colors.accentSoft}, 0 20px 48px rgba(0, 0, 0, 0.12)`,
+                zIndex: 80,
+                cursor: 'grab',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 10,
+                  right: 12,
+                  padding: '5px 10px',
+                  borderRadius: 9999,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: colors.textOnAccent,
+                  background: colors.accent,
+                  letterSpacing: '0.01em',
+                }}
+              >
+                Hold Shift and drag to reposition
+              </div>
+            </div>
+          )}
 
           <AnimatePresence initial={false}>
             {marketplaceOpen && (
@@ -197,7 +237,6 @@ export default function App() {
               position: 'relative',
               zIndex: isExpanded ? 20 : 10,
             }}
-            {...windowDrag}
           >
             {/* Tab strip — always mounted */}
             <div>

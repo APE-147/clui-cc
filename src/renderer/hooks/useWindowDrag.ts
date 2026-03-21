@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 
 type DragState = {
@@ -8,32 +8,18 @@ type DragState = {
   windowY: number
 }
 
-const DRAG_BLOCKER_SELECTOR = [
-  '.no-drag',
-  '.conversation-selectable',
-  'button',
-  'input',
-  'textarea',
-  'select',
-  'option',
-  'label',
-  'a[href]',
-  '[role="button"]',
-  '[contenteditable="true"]',
-  '[data-no-window-drag]',
-].join(', ')
-
 function updateDragMarker(active: boolean): void {
   document.documentElement.dataset.windowDragging = active ? 'true' : 'false'
-  document.body.style.cursor = active ? 'grabbing' : ''
   document.body.style.userSelect = active ? 'none' : ''
 }
 
 export function useWindowDrag() {
+  const [isRepositionMode, setIsRepositionMode] = useState(false)
   const dragStateRef = useRef<DragState | null>(null)
+  const pointerRef = useRef<{ clientX: number; clientY: number } | null>(null)
 
-  const syncIgnoreMouseEvents = useCallback((event?: MouseEvent) => {
-    const element = event ? document.elementFromPoint(event.clientX, event.clientY) : null
+  const syncIgnoreMouseEvents = useCallback((point?: { clientX: number; clientY: number } | null) => {
+    const element = point ? document.elementFromPoint(point.clientX, point.clientY) : null
     const isUi = !!(element && element.closest('[data-clui-ui]'))
     if (isUi) {
       window.clui.setIgnoreMouseEvents(false)
@@ -42,15 +28,38 @@ export function useWindowDrag() {
     window.clui.setIgnoreMouseEvents(true, { forward: true })
   }, [])
 
-  const stopDragging = useCallback((event?: MouseEvent) => {
-    if (!dragStateRef.current) return
+  const updateBodyCursor = useCallback((nextDragging: boolean, nextMode: boolean) => {
+    document.body.style.cursor = nextDragging ? 'grabbing' : nextMode ? 'grab' : ''
+  }, [])
+
+  const stopDragging = useCallback((point?: { clientX: number; clientY: number } | null) => {
+    if (!dragStateRef.current && document.documentElement.dataset.windowDragging !== 'true') return
     dragStateRef.current = null
     updateDragMarker(false)
-    syncIgnoreMouseEvents(event)
-  }, [syncIgnoreMouseEvents])
+    updateBodyCursor(false, document.documentElement.dataset.windowRepositionMode === 'true')
+    if (document.documentElement.dataset.windowRepositionMode !== 'true') {
+      syncIgnoreMouseEvents(point ?? pointerRef.current)
+    }
+  }, [syncIgnoreMouseEvents, updateBodyCursor])
+
+  const setRepositionMode = useCallback((active: boolean) => {
+    document.documentElement.dataset.windowRepositionMode = active ? 'true' : 'false'
+    setIsRepositionMode(active)
+    updateBodyCursor(false, active)
+
+    if (active) {
+      window.clui.setIgnoreMouseEvents(false)
+      return
+    }
+
+    stopDragging(pointerRef.current)
+    syncIgnoreMouseEvents(pointerRef.current)
+  }, [stopDragging, syncIgnoreMouseEvents, updateBodyCursor])
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
+      pointerRef.current = { clientX: event.clientX, clientY: event.clientY }
+
       const dragState = dragStateRef.current
       if (!dragState) return
 
@@ -60,34 +69,49 @@ export function useWindowDrag() {
     }
 
     const handleMouseUp = (event: MouseEvent) => {
-      stopDragging(event)
+      stopDragging({ clientX: event.clientX, clientY: event.clientY })
     }
 
     const handleWindowBlur = () => {
-      stopDragging()
+      setRepositionMode(false)
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Shift') return
+      if (!document.hasFocus()) return
+      if (document.documentElement.dataset.windowRepositionMode === 'true') return
+      setRepositionMode(true)
+    }
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key !== 'Shift') return
+      setRepositionMode(false)
     }
 
     window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('mouseup', handleMouseUp)
     window.addEventListener('blur', handleWindowBlur)
+    window.addEventListener('keydown', handleKeyDown, true)
+    window.addEventListener('keyup', handleKeyUp, true)
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
       window.removeEventListener('blur', handleWindowBlur)
+      window.removeEventListener('keydown', handleKeyDown, true)
+      window.removeEventListener('keyup', handleKeyUp, true)
     }
-  }, [stopDragging])
+  }, [setRepositionMode, stopDragging])
 
   useEffect(() => () => {
+    document.documentElement.dataset.windowRepositionMode = 'false'
     updateDragMarker(false)
+    updateBodyCursor(false, false)
   }, [])
 
   const handleMouseDown = useCallback(async (event: ReactMouseEvent<HTMLElement>) => {
+    if (document.documentElement.dataset.windowRepositionMode !== 'true') return
     if (event.button !== 0) return
-
-    const target = event.target
-    if (!(target instanceof HTMLElement)) return
-    if (target.closest(DRAG_BLOCKER_SELECTOR)) return
 
     const bounds = await window.clui.getWindowBounds()
     if (!bounds) return
@@ -100,11 +124,14 @@ export function useWindowDrag() {
     }
 
     updateDragMarker(true)
+    updateBodyCursor(true, true)
     window.clui.setIgnoreMouseEvents(false)
     event.preventDefault()
-  }, [])
+    event.stopPropagation()
+  }, [updateBodyCursor])
 
   return {
+    isRepositionMode,
     onMouseDown: handleMouseDown,
   }
 }

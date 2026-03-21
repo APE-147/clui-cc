@@ -327,8 +327,8 @@ function saveSettings(s: { themeMode: ThemeMode; soundEnabled: boolean; expanded
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)) } catch {}
 }
 
-// Always start in full-width UI mode on launch for the daily-use install.
-const saved = { ...loadSettings(), expandedUI: true }
+// Default new installs to full width, but keep the user's explicit preference.
+const saved = loadSettings()
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
   isDark: saved.themeMode === 'dark' ? true : saved.themeMode === 'light' ? false : true,

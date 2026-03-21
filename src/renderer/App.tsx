@@ -9,8 +9,9 @@ import { MarketplacePanel } from './components/MarketplacePanel'
 import { PopoverLayerProvider } from './components/PopoverLayer'
 import { useClaudeEvents } from './hooks/useClaudeEvents'
 import { useHealthReconciliation } from './hooks/useHealthReconciliation'
+import { getResponsiveLayoutMetrics, useViewportSize } from './layout'
 import { useSessionStore } from './stores/sessionStore'
-import { useColors, useThemeStore, spacing } from './theme'
+import { useColors, useThemeStore } from './theme'
 
 const TRANSITION = { duration: 0.26, ease: [0.4, 0, 0.1, 1] as const }
 
@@ -94,13 +95,10 @@ export default function App() {
   const isExpanded = useSessionStore((s) => s.isExpanded)
   const marketplaceOpen = useSessionStore((s) => s.marketplaceOpen)
   const isRunning = activeTabStatus === 'running' || activeTabStatus === 'connecting'
+  const viewport = useViewportSize()
 
-  // Layout dimensions — expandedUI widens and heightens the panel
-  const contentWidth = expandedUI ? 700 : spacing.contentWidth
-  const cardExpandedWidth = expandedUI ? 700 : 460
-  const cardCollapsedWidth = expandedUI ? 670 : 430
-  const cardCollapsedMargin = expandedUI ? 15 : 15
-  const bodyMaxHeight = expandedUI ? 520 : 400
+  // Layout dimensions scale with the native window size instead of fixed pixels.
+  const layout = getResponsiveLayoutMetrics(viewport.width, viewport.height, expandedUI)
 
   const handleScreenshot = useCallback(async () => {
     const result = await window.clui.takeScreenshot()
@@ -118,16 +116,16 @@ export default function App() {
     <PopoverLayerProvider>
       <div className="flex flex-col justify-end h-full" style={{ background: 'transparent' }}>
 
-        {/* ─── 460px content column, centered. Circles overflow left. ─── */}
-        <div style={{ width: contentWidth, position: 'relative', margin: '0 auto', transition: 'width 0.26s cubic-bezier(0.4, 0, 0.1, 1)' }}>
+        {/* ─── Responsive content column, centered. Circles overflow left. ─── */}
+        <div style={{ width: layout.contentWidth, position: 'relative', margin: '0 auto', transition: 'width 0.26s cubic-bezier(0.4, 0, 0.1, 1)' }}>
 
           <AnimatePresence initial={false}>
             {marketplaceOpen && (
               <div
                 data-clui-ui
                 style={{
-                  width: 720,
-                  maxWidth: 720,
+                  width: layout.marketplaceWidth,
+                  maxWidth: layout.marketplaceWidth,
                   marginLeft: '50%',
                   transform: 'translateX(-50%)',
                   marginBottom: 14,
@@ -146,10 +144,10 @@ export default function App() {
                     className="glass-surface overflow-hidden no-drag"
                     style={{
                       borderRadius: 24,
-                      maxHeight: 470,
+                      maxHeight: layout.marketplaceHeight,
                     }}
                   >
-                    <MarketplacePanel />
+                    <MarketplacePanel height={layout.marketplaceHeight} />
                   </div>
                 </motion.div>
               </div>
@@ -165,10 +163,10 @@ export default function App() {
             data-clui-ui
             className="overflow-hidden flex flex-col drag-region"
             animate={{
-              width: isExpanded ? cardExpandedWidth : cardCollapsedWidth,
+              width: isExpanded ? layout.cardExpandedWidth : layout.cardCollapsedWidth,
               marginBottom: isExpanded ? 10 : -14,
-              marginLeft: isExpanded ? 0 : cardCollapsedMargin,
-              marginRight: isExpanded ? 0 : cardCollapsedMargin,
+              marginLeft: isExpanded ? 0 : layout.cardCollapsedMargin,
+              marginRight: isExpanded ? 0 : layout.cardCollapsedMargin,
               background: isExpanded ? colors.containerBg : colors.containerBgCollapsed,
               borderColor: colors.containerBorder,
               boxShadow: isExpanded ? colors.cardShadow : colors.cardShadowCollapsed,
@@ -197,8 +195,8 @@ export default function App() {
               transition={TRANSITION}
               className="overflow-hidden no-drag"
             >
-              <div style={{ maxHeight: bodyMaxHeight }}>
-                <ConversationView />
+              <div style={{ maxHeight: layout.bodyMaxHeight }}>
+                <ConversationView maxHeight={layout.conversationMaxHeight} />
                 <StatusBar />
               </div>
             </motion.div>

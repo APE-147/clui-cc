@@ -5,7 +5,7 @@ import { useSessionStore } from '../stores/sessionStore'
 import { useColors } from '../theme'
 import type { CatalogPlugin, PluginStatus } from '../../shared/types'
 
-export function MarketplacePanel() {
+export function MarketplacePanel({ height }: { height: number }) {
   const colors = useColors()
   const catalog = useSessionStore((s) => s.marketplaceCatalog)
   const loading = useSessionStore((s) => s.marketplaceLoading)
@@ -93,7 +93,7 @@ export function MarketplacePanel() {
     <div
       data-clui-ui
       style={{
-        height: 470,
+        height,
         display: 'flex',
         flexDirection: 'column',
       }}

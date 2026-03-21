@@ -59,6 +59,18 @@ export function useWindowDrag() {
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
       pointerRef.current = { clientX: event.clientX, clientY: event.clientY }
+      const hoveredElement = document.elementFromPoint(event.clientX, event.clientY)
+      const hoveringUi = !!(hoveredElement && hoveredElement.closest('[data-clui-ui]'))
+
+      if (!dragStateRef.current) {
+        if (event.shiftKey && hoveringUi) {
+          if (document.documentElement.dataset.windowRepositionMode !== 'true') {
+            setRepositionMode(true)
+          }
+        } else if (document.documentElement.dataset.windowRepositionMode === 'true') {
+          setRepositionMode(false)
+        }
+      }
 
       const dragState = dragStateRef.current
       if (!dragState) return
@@ -98,8 +110,11 @@ export function useWindowDrag() {
   }, [])
 
   const handleMouseDown = useCallback(async (event: ReactMouseEvent<HTMLElement>) => {
-    if (document.documentElement.dataset.windowRepositionMode !== 'true') return
     if (event.button !== 0) return
+    if (event.shiftKey && document.documentElement.dataset.windowRepositionMode !== 'true') {
+      setRepositionMode(true)
+    }
+    if (document.documentElement.dataset.windowRepositionMode !== 'true') return
 
     const bounds = await window.clui.getWindowBounds()
     if (!bounds) return
@@ -116,7 +131,7 @@ export function useWindowDrag() {
     window.clui.setIgnoreMouseEvents(false)
     event.preventDefault()
     event.stopPropagation()
-  }, [updateBodyCursor])
+  }, [setRepositionMode, updateBodyCursor])
 
   return {
     isRepositionMode,

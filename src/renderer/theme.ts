@@ -277,12 +277,14 @@ interface ThemeState {
   themeMode: ThemeMode
   soundEnabled: boolean
   expandedUI: boolean
+  uiScale: number
   /** OS-reported dark mode — used when themeMode is 'system' */
   _systemIsDark: boolean
   setIsDark: (isDark: boolean) => void
   setThemeMode: (mode: ThemeMode) => void
   setSoundEnabled: (enabled: boolean) => void
   setExpandedUI: (expanded: boolean) => void
+  setUiScale: (scale: number) => void
   /** Called by OS theme change listener — updates system value */
   setSystemTheme: (isDark: boolean) => void
 }
@@ -308,7 +310,11 @@ function applyTheme(isDark: boolean): void {
 
 const SETTINGS_KEY = 'clui-settings'
 
-function loadSettings(): { themeMode: ThemeMode; soundEnabled: boolean; expandedUI: boolean } {
+function clampUiScale(value: number): number {
+  return Math.min(Math.max(value, 0.9), 1.2)
+}
+
+function loadSettings(): { themeMode: ThemeMode; soundEnabled: boolean; expandedUI: boolean; uiScale: number } {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)
     if (raw) {
@@ -317,13 +323,14 @@ function loadSettings(): { themeMode: ThemeMode; soundEnabled: boolean; expanded
         themeMode: ['light', 'dark'].includes(parsed.themeMode) ? parsed.themeMode : 'dark',
         soundEnabled: typeof parsed.soundEnabled === 'boolean' ? parsed.soundEnabled : true,
         expandedUI: typeof parsed.expandedUI === 'boolean' ? parsed.expandedUI : true,
+        uiScale: typeof parsed.uiScale === 'number' ? clampUiScale(parsed.uiScale) : 1,
       }
     }
   } catch {}
-  return { themeMode: 'dark', soundEnabled: true, expandedUI: true }
+  return { themeMode: 'dark', soundEnabled: true, expandedUI: true, uiScale: 1 }
 }
 
-function saveSettings(s: { themeMode: ThemeMode; soundEnabled: boolean; expandedUI: boolean }): void {
+function saveSettings(s: { themeMode: ThemeMode; soundEnabled: boolean; expandedUI: boolean; uiScale: number }): void {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)) } catch {}
 }
 
@@ -335,6 +342,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   themeMode: saved.themeMode,
   soundEnabled: saved.soundEnabled,
   expandedUI: saved.expandedUI,
+  uiScale: saved.uiScale,
   _systemIsDark: true,
   setIsDark: (isDark) => {
     set({ isDark })
@@ -344,15 +352,20 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     const resolved = mode === 'system' ? get()._systemIsDark : mode === 'dark'
     set({ themeMode: mode, isDark: resolved })
     applyTheme(resolved)
-    saveSettings({ themeMode: mode, soundEnabled: get().soundEnabled, expandedUI: get().expandedUI })
+    saveSettings({ themeMode: mode, soundEnabled: get().soundEnabled, expandedUI: get().expandedUI, uiScale: get().uiScale })
   },
   setSoundEnabled: (enabled) => {
     set({ soundEnabled: enabled })
-    saveSettings({ themeMode: get().themeMode, soundEnabled: enabled, expandedUI: get().expandedUI })
+    saveSettings({ themeMode: get().themeMode, soundEnabled: enabled, expandedUI: get().expandedUI, uiScale: get().uiScale })
   },
   setExpandedUI: (expanded) => {
     set({ expandedUI: expanded })
-    saveSettings({ themeMode: get().themeMode, soundEnabled: get().soundEnabled, expandedUI: expanded })
+    saveSettings({ themeMode: get().themeMode, soundEnabled: get().soundEnabled, expandedUI: expanded, uiScale: get().uiScale })
+  },
+  setUiScale: (scale) => {
+    const clamped = clampUiScale(scale)
+    set({ uiScale: clamped })
+    saveSettings({ themeMode: get().themeMode, soundEnabled: get().soundEnabled, expandedUI: get().expandedUI, uiScale: clamped })
   },
   setSystemTheme: (isDark) => {
     set({ _systemIsDark: isDark })

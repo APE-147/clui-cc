@@ -24,6 +24,7 @@ export default function App() {
   const colors = useColors()
   const setSystemTheme = useThemeStore((s) => s.setSystemTheme)
   const expandedUI = useThemeStore((s) => s.expandedUI)
+  const userUiScale = useThemeStore((s) => s.uiScale)
 
   // ─── Theme initialization ───
   useEffect(() => {
@@ -98,7 +99,13 @@ export default function App() {
   const viewport = useViewportSize()
 
   // Layout dimensions scale with the native window size instead of fixed pixels.
-  const layout = getResponsiveLayoutMetrics(viewport.width, viewport.height, expandedUI)
+  const baseLayout = getResponsiveLayoutMetrics(viewport.width, viewport.height, expandedUI)
+  const effectiveUiScale = Math.min(Math.max(baseLayout.autoUiScale * userUiScale, 0.94), 1.28)
+  const layout = getResponsiveLayoutMetrics(
+    viewport.width / effectiveUiScale,
+    viewport.height / effectiveUiScale,
+    expandedUI,
+  )
 
   const handleScreenshot = useCallback(async () => {
     const result = await window.clui.takeScreenshot()
@@ -114,7 +121,7 @@ export default function App() {
 
   return (
     <PopoverLayerProvider>
-      <div className="flex flex-col justify-end h-full" style={{ background: 'transparent' }}>
+      <div className="flex flex-col justify-end h-full" style={{ background: 'transparent', zoom: effectiveUiScale }}>
 
         {/* ─── Responsive content column, centered. Circles overflow left. ─── */}
         <div style={{ width: layout.contentWidth, position: 'relative', margin: '0 auto', transition: 'width 0.26s cubic-bezier(0.4, 0, 0.1, 1)' }}>
@@ -180,6 +187,23 @@ export default function App() {
               zIndex: isExpanded ? 20 : 10,
             }}
           >
+            <div
+              data-clui-ui
+              className="drag-region flex items-center justify-center"
+              style={{ paddingTop: 10, paddingBottom: 2, cursor: 'grab' }}
+              title="Drag to move launcher"
+            >
+              <div
+                style={{
+                  width: 42,
+                  height: 5,
+                  borderRadius: 9999,
+                  background: colors.surfaceSecondary,
+                  opacity: 0.92,
+                }}
+              />
+            </div>
+
             {/* Tab strip — always mounted */}
             <div className="no-drag">
               <TabStrip />

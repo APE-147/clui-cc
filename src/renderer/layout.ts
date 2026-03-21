@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 export interface ResponsiveLayoutMetrics {
+  autoUiScale: number
   contentWidth: number
   cardExpandedWidth: number
   cardCollapsedWidth: number
@@ -44,6 +45,11 @@ export function getResponsiveLayoutMetrics(
 ): ResponsiveLayoutMetrics {
   const safeWidth = Math.max(viewportWidth, 720)
   const safeHeight = Math.max(viewportHeight, 560)
+  const autoUiScale = clamp(
+    Math.min(safeWidth / 1040, safeHeight / 720),
+    0.94,
+    1.22,
+  )
 
   const contentMaxWidth = Math.max(420, safeWidth - 176)
   const contentMinWidth = Math.min(expandedUI ? 560 : 420, contentMaxWidth)
@@ -81,6 +87,7 @@ export function getResponsiveLayoutMetrics(
   const conversationMaxHeight = Math.max(240, bodyMaxHeight - 60)
 
   return {
+    autoUiScale,
     contentWidth,
     cardExpandedWidth,
     cardCollapsedWidth,

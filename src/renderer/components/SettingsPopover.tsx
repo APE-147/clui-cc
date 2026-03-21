@@ -50,6 +50,8 @@ export function SettingsPopover() {
   const setThemeMode = useThemeStore((s) => s.setThemeMode)
   const expandedUI = useThemeStore((s) => s.expandedUI)
   const setExpandedUI = useThemeStore((s) => s.setExpandedUI)
+  const uiScale = useThemeStore((s) => s.uiScale)
+  const setUiScale = useThemeStore((s) => s.setUiScale)
   const isExpanded = useSessionStore((s) => s.isExpanded)
   const popoverLayer = usePopoverLayer()
   const colors = useColors()
@@ -179,6 +181,46 @@ export function SettingsPopover() {
                   colors={colors}
                   label="Toggle full width panel"
                 />
+              </div>
+            </div>
+
+            <div style={{ height: 1, background: colors.popoverBorder }} />
+
+            {/* UI scale */}
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[12px] font-medium" style={{ color: colors.textPrimary }}>
+                    UI scale
+                  </div>
+                  <div className="text-[11px]" style={{ color: colors.textTertiary }}>
+                    Auto size plus your preference
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  {[
+                    { label: '100%', value: 1 },
+                    { label: '110%', value: 1.1 },
+                    { label: '120%', value: 1.2 },
+                  ].map((option) => {
+                    const active = Math.abs(uiScale - option.value) < 0.001
+                    return (
+                      <button
+                        key={option.label}
+                        type="button"
+                        onClick={() => setUiScale(option.value)}
+                        className="rounded-md px-2 py-1 text-[11px] transition-colors"
+                        style={{
+                          color: active ? colors.textOnAccent : colors.textSecondary,
+                          background: active ? colors.accent : colors.surfaceSecondary,
+                          border: `1px solid ${active ? colors.accent : colors.containerBorder}`,
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             </div>
 

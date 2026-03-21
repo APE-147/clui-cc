@@ -29,10 +29,10 @@ const INTERACTIVE_PTY = process.env.CLUI_INTERACTIVE_PERMISSIONS_PTY === '1'
 const controlPlane = new ControlPlane(INTERACTIVE_PTY)
 
 // Keep native width fixed to avoid renderer animation vs setBounds race.
-// The UI itself still launches in compact mode; extra width is transparent/click-through.
-const BAR_WIDTH = 1040
-const PILL_HEIGHT = 720  // Fixed native window height — extra room for expanded UI + shadow buffers
-const PILL_BOTTOM_MARGIN = 24
+// Daily-use defaults: wider canvas, a bit more vertical room, and a higher resting position.
+const BAR_WIDTH = 1180
+const PILL_HEIGHT = 780  // Fixed native window height — extra room for expanded UI + shadow buffers
+const PILL_BOTTOM_MARGIN = 48
 
 // ─── Broadcast to renderer ───
 

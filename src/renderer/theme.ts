@@ -316,19 +316,19 @@ function loadSettings(): { themeMode: ThemeMode; soundEnabled: boolean; expanded
       return {
         themeMode: ['light', 'dark'].includes(parsed.themeMode) ? parsed.themeMode : 'dark',
         soundEnabled: typeof parsed.soundEnabled === 'boolean' ? parsed.soundEnabled : true,
-        expandedUI: typeof parsed.expandedUI === 'boolean' ? parsed.expandedUI : false,
+        expandedUI: typeof parsed.expandedUI === 'boolean' ? parsed.expandedUI : true,
       }
     }
   } catch {}
-  return { themeMode: 'dark', soundEnabled: true, expandedUI: false }
+  return { themeMode: 'dark', soundEnabled: true, expandedUI: true }
 }
 
 function saveSettings(s: { themeMode: ThemeMode; soundEnabled: boolean; expandedUI: boolean }): void {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)) } catch {}
 }
 
-// Always start in compact UI mode on launch.
-const saved = { ...loadSettings(), expandedUI: false }
+// Always start in full-width UI mode on launch for the daily-use install.
+const saved = { ...loadSettings(), expandedUI: true }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
   isDark: saved.themeMode === 'dark' ? true : saved.themeMode === 'light' ? false : true,

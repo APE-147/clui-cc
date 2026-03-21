@@ -187,25 +187,8 @@ export default function App() {
               zIndex: isExpanded ? 20 : 10,
             }}
           >
-            <div
-              data-clui-ui
-              className="drag-region flex items-center justify-center"
-              style={{ paddingTop: 10, paddingBottom: 2, cursor: 'grab' }}
-              title="Drag to move launcher"
-            >
-              <div
-                style={{
-                  width: 42,
-                  height: 5,
-                  borderRadius: 9999,
-                  background: colors.surfaceSecondary,
-                  opacity: 0.92,
-                }}
-              />
-            </div>
-
             {/* Tab strip — always mounted */}
-            <div className="no-drag">
+            <div>
               <TabStrip />
             </div>
 

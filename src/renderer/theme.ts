@@ -4,7 +4,7 @@
  */
 import { create } from 'zustand'
 import { DEFAULT_MODEL_ID, DEFAULT_PROVIDER_ID, isKnownModelId } from './models'
-import { normalizeUiScale } from './layout'
+import { normalizeUiScale, normalizeWidthScale, type UiScalePercent } from './layout'
 import type { CliTerminalApp } from '../shared/types'
 import type { CodexReasoningEffort, ProviderId } from '../shared/provider-types'
 
@@ -311,7 +311,10 @@ interface ThemeState {
   themeMode: ThemeMode
   soundEnabled: boolean
   expandedUI: boolean
+  /** Width-only scale for the floating input column */
   pillScale: number
+  /** Whole floating input UI scale */
+  uiScale: UiScalePercent
   /** Global default model for new sessions (per-session overrides live on TabState) */
   defaultModel: string
   /** Global default provider for new tabs */
@@ -330,6 +333,7 @@ interface ThemeState {
   setSoundEnabled: (enabled: boolean) => void
   setExpandedUI: (expanded: boolean) => void
   setPillScale: (scale: number) => void
+  setUiScale: (scale: UiScalePercent) => void
   setDefaultModel: (modelId: string) => void
   setDefaultProvider: (provider: ProviderId) => void
   setProviderEndpoint: (endpoint: string) => void
@@ -366,6 +370,7 @@ type PersistedSettings = {
   soundEnabled: boolean
   expandedUI: boolean
   pillScale: number
+  uiScale: UiScalePercent
   defaultModel: string
   defaultProvider: ProviderId
   providerEndpoint: string
@@ -382,12 +387,14 @@ function loadSettings(): PersistedSettings {
     const raw = localStorage.getItem(SETTINGS_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      const pillScale = normalizeUiScale(parsed.pillScale)
+      const pillScale = normalizeWidthScale(parsed.pillScale)
+      const uiScale = normalizeUiScale(parsed.uiScale ?? parsed.pillScale)
       return {
         themeMode: ['light', 'dark'].includes(parsed.themeMode) ? parsed.themeMode : 'dark',
         soundEnabled: typeof parsed.soundEnabled === 'boolean' ? parsed.soundEnabled : true,
         expandedUI: typeof parsed.expandedUI === 'boolean' ? parsed.expandedUI : false,
         pillScale,
+        uiScale,
         defaultModel: isKnownModelId(parsed.defaultModel) ? parsed.defaultModel : DEFAULT_MODEL_ID,
         defaultProvider: isProviderId(parsed.defaultProvider) ? parsed.defaultProvider : DEFAULT_PROVIDER_ID,
         providerEndpoint: typeof parsed.providerEndpoint === 'string' ? parsed.providerEndpoint : '',
@@ -401,6 +408,7 @@ function loadSettings(): PersistedSettings {
     soundEnabled: true,
     expandedUI: false,
     pillScale: 100,
+    uiScale: 100,
     defaultModel: DEFAULT_MODEL_ID,
     defaultProvider: DEFAULT_PROVIDER_ID,
     providerEndpoint: '',
@@ -419,6 +427,7 @@ function snapshotSettings(get: () => ThemeState): PersistedSettings {
     soundEnabled: get().soundEnabled,
     expandedUI: get().expandedUI,
     pillScale: get().pillScale,
+    uiScale: get().uiScale,
     defaultModel: get().defaultModel,
     defaultProvider: get().defaultProvider,
     providerEndpoint: get().providerEndpoint,
@@ -435,6 +444,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   soundEnabled: saved.soundEnabled,
   expandedUI: saved.expandedUI,
   pillScale: saved.pillScale,
+  uiScale: saved.uiScale,
   defaultModel: saved.defaultModel,
   defaultProvider: saved.defaultProvider,
   providerEndpoint: saved.providerEndpoint,
@@ -461,7 +471,11 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     saveSettings(snapshotSettings(get))
   },
   setPillScale: (scale) => {
-    set({ pillScale: normalizeUiScale(scale) })
+    set({ pillScale: normalizeWidthScale(scale) })
+    saveSettings(snapshotSettings(get))
+  },
+  setUiScale: (scale) => {
+    set({ uiScale: normalizeUiScale(scale) })
     saveSettings(snapshotSettings(get))
   },
   setDefaultModel: (modelId) => {

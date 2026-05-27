@@ -41,8 +41,8 @@ function RowToggle({
 }
 
 function UIScaleControl() {
-  const pillScale = useThemeStore((s) => s.pillScale)
-  const setPillScale = useThemeStore((s) => s.setPillScale)
+  const uiScale = useThemeStore((s) => s.uiScale)
+  const setUiScale = useThemeStore((s) => s.setUiScale)
   const colors = useColors()
 
   return (
@@ -51,18 +51,18 @@ function UIScaleControl() {
         <div className="flex items-center gap-2 min-w-0">
           <ArrowsHorizontal size={14} style={{ color: colors.textTertiary }} />
           <div className="text-[12px] font-medium" style={{ color: colors.textPrimary }}>
-            Scale
+            UI scale
           </div>
         </div>
         <div className="flex items-center gap-1">
           {UI_SCALE_OPTIONS.map((scale) => {
-            const selected = pillScale === scale
+            const selected = uiScale === scale
             return (
               <button
                 key={scale}
                 type="button"
                 onClick={() => {
-                  setPillScale(scale)
+                  setUiScale(scale)
                   window.dispatchEvent(new CustomEvent('clui-scale-start'))
                   window.dispatchEvent(new CustomEvent('clui-scale-done'))
                 }}
@@ -80,6 +80,60 @@ function UIScaleControl() {
           })}
         </div>
       </div>
+    </div>
+  )
+}
+
+function WidthScaleSlider() {
+  const pillScale = useThemeStore((s) => s.pillScale)
+  const setPillScale = useThemeStore((s) => s.setPillScale)
+  const colors = useColors()
+  const [local, setLocal] = useState(pillScale)
+  const [dragging, setDragging] = useState(false)
+
+  useEffect(() => {
+    if (!dragging) setLocal(pillScale)
+  }, [pillScale, dragging])
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <ArrowsHorizontal size={14} style={{ color: colors.textTertiary }} />
+          <div className="text-[12px] font-medium" style={{ color: colors.textPrimary }}>
+            Width
+          </div>
+        </div>
+        <div
+          className="text-[11px] font-medium tabular-nums rounded-full px-2 py-0.5"
+          style={{ color: colors.textSecondary, border: `1px solid ${colors.containerBorder}` }}
+        >
+          {local}%
+        </div>
+      </div>
+      <input
+        type="range"
+        min={75}
+        max={150}
+        step={5}
+        value={local}
+        onChange={(e) => {
+          const v = Number(e.target.value)
+          setLocal(v)
+          setPillScale(v)
+        }}
+        onPointerDown={() => {
+          setDragging(true)
+          window.dispatchEvent(new CustomEvent('clui-scale-start'))
+          const onUp = () => {
+            setDragging(false)
+            window.dispatchEvent(new CustomEvent('clui-scale-done'))
+          }
+          window.addEventListener('pointerup', onUp, { once: true })
+        }}
+        className="w-full mt-1 cursor-pointer"
+        style={{ accentColor: colors.accent, height: 4 }}
+      />
     </div>
   )
 }
@@ -197,6 +251,7 @@ export function SettingsContent() {
   return (
     <div className="p-3 flex flex-col gap-2.5">
       <UIScaleControl />
+      <WidthScaleSlider />
 
       <div style={{ height: 1, background: colors.popoverBorder }} />
 

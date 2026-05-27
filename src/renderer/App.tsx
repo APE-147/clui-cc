@@ -182,6 +182,7 @@ export default function App() {
   const isRunning = activeTabStatus === 'running' || activeTabStatus === 'connecting'
 
   const pillScale = useThemeStore((s) => s.pillScale)
+  const uiScale = useThemeStore((s) => s.uiScale)
 
   const {
     contentWidth,
@@ -192,7 +193,8 @@ export default function App() {
   } = getScaledLayout({
     expandedUI,
     contentWidth: spacing.contentWidth,
-    uiScale: pillScale,
+    widthScale: pillScale,
+    uiScale,
   })
   const cardCollapsedMargin = 15
 

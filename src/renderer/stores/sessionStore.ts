@@ -51,7 +51,8 @@ interface State {
   /** Global permission mode: 'ask' shows cards, 'auto' auto-approves all tool calls */
   permissionMode: 'ask' | 'auto'
 
-  // Marketplace state
+  // Panel state
+  historyOpen: boolean
   marketplaceOpen: boolean
   marketplaceCatalog: CatalogPlugin[]
   marketplaceLoading: boolean
@@ -72,6 +73,7 @@ interface State {
   closeTab: (tabId: string) => void
   clearTab: () => void
   toggleExpanded: () => void
+  toggleHistory: () => void
   toggleMarketplace: () => void
   closeMarketplace: () => void
   loadMarketplace: (forceRefresh?: boolean) => Promise<void>
@@ -183,7 +185,8 @@ export const useSessionStore = create<State>((set, get) => ({
   staticInfo: null,
   permissionMode: 'ask',
 
-  // Marketplace
+  // Panels
+  historyOpen: false,
   marketplaceOpen: false,
   marketplaceCatalog: [],
   marketplaceLoading: false,
@@ -296,6 +299,7 @@ export const useSessionStore = create<State>((set, get) => ({
       set((prev) => ({
         isExpanded: willExpand,
         marketplaceOpen: false,
+        historyOpen: false,
         // Expanding = reading: clear unread flag
         tabs: willExpand
           ? prev.tabs.map((t) => t.id === tabId ? { ...t, hasUnread: false } : t)
@@ -306,6 +310,7 @@ export const useSessionStore = create<State>((set, get) => ({
       set((prev) => ({
         activeTabId: tabId,
         marketplaceOpen: false,
+        historyOpen: false,
         tabs: prev.tabs.map((t) =>
           t.id === tabId ? { ...t, hasUnread: false } : t
         ),
@@ -319,6 +324,7 @@ export const useSessionStore = create<State>((set, get) => ({
     set((s) => ({
       isExpanded: willExpand,
       marketplaceOpen: false,
+      historyOpen: false,
       // Expanding = reading: clear unread flag for the active tab
       tabs: willExpand
         ? s.tabs.map((t) => t.id === activeTabId ? { ...t, hasUnread: false } : t)
@@ -326,12 +332,23 @@ export const useSessionStore = create<State>((set, get) => ({
     }))
   },
 
+  toggleHistory: () => {
+    const s = get()
+    if (s.historyOpen) {
+      set({ historyOpen: false })
+    } else {
+      set({ isExpanded: false, historyOpen: true, marketplaceOpen: false })
+      if (useThemeStore.getState().settingsOpen) useThemeStore.setState({ settingsOpen: false })
+    }
+  },
+
   toggleMarketplace: () => {
     const s = get()
     if (s.marketplaceOpen) {
       set({ marketplaceOpen: false })
     } else {
-      set({ isExpanded: false, marketplaceOpen: true })
+      set({ isExpanded: false, marketplaceOpen: true, historyOpen: false })
+      if (useThemeStore.getState().settingsOpen) useThemeStore.setState({ settingsOpen: false })
       get().loadMarketplace()
     }
   },
@@ -412,7 +429,7 @@ export const useSessionStore = create<State>((set, get) => ({
   },
 
   buildYourOwn: () => {
-    set({ marketplaceOpen: false, isExpanded: true })
+    set({ marketplaceOpen: false, historyOpen: false, isExpanded: true })
     // Small delay to let the UI transition
     setTimeout(() => {
       get().sendMessage('Help me create a new Claude Code skill')

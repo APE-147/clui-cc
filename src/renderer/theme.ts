@@ -298,18 +298,22 @@ interface ThemeState {
   themeMode: ThemeMode
   soundEnabled: boolean
   expandedUI: boolean
+  pillScale: number
   /** Global default model for new sessions (per-session overrides live on TabState) */
   defaultModel: string
   /** macOS app for "Open in CLI" */
   cliTerminal: CliTerminalApp
+  settingsOpen: boolean
   /** OS-reported dark mode — used when themeMode is 'system' */
   _systemIsDark: boolean
   setIsDark: (isDark: boolean) => void
   setThemeMode: (mode: ThemeMode) => void
   setSoundEnabled: (enabled: boolean) => void
   setExpandedUI: (expanded: boolean) => void
+  setPillScale: (scale: number) => void
   setDefaultModel: (modelId: string) => void
   setCliTerminal: (app: CliTerminalApp) => void
+  toggleSettings: () => void
   /** Called by OS theme change listener — updates system value */
   setSystemTheme: (isDark: boolean) => void
 }
@@ -339,6 +343,7 @@ type PersistedSettings = {
   themeMode: ThemeMode
   soundEnabled: boolean
   expandedUI: boolean
+  pillScale: number
   defaultModel: string
   cliTerminal: CliTerminalApp
 }
@@ -348,16 +353,25 @@ function loadSettings(): PersistedSettings {
     const raw = localStorage.getItem(SETTINGS_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
+      const pillScale = typeof parsed.pillScale === 'number' ? Math.max(75, Math.min(150, parsed.pillScale)) : 100
       return {
         themeMode: ['light', 'dark'].includes(parsed.themeMode) ? parsed.themeMode : 'dark',
         soundEnabled: typeof parsed.soundEnabled === 'boolean' ? parsed.soundEnabled : true,
         expandedUI: typeof parsed.expandedUI === 'boolean' ? parsed.expandedUI : false,
+        pillScale,
         defaultModel: isKnownModelId(parsed.defaultModel) ? parsed.defaultModel : DEFAULT_MODEL_ID,
         cliTerminal: isCliTerminalApp(parsed.cliTerminal) ? parsed.cliTerminal : 'terminal',
       }
     }
   } catch {}
-  return { themeMode: 'dark', soundEnabled: true, expandedUI: false, defaultModel: DEFAULT_MODEL_ID, cliTerminal: 'terminal' }
+  return {
+    themeMode: 'dark',
+    soundEnabled: true,
+    expandedUI: false,
+    pillScale: 100,
+    defaultModel: DEFAULT_MODEL_ID,
+    cliTerminal: 'terminal',
+  }
 }
 
 function saveSettings(s: PersistedSettings): void {
@@ -369,6 +383,7 @@ function snapshotSettings(get: () => ThemeState): PersistedSettings {
     themeMode: get().themeMode,
     soundEnabled: get().soundEnabled,
     expandedUI: get().expandedUI,
+    pillScale: get().pillScale,
     defaultModel: get().defaultModel,
     cliTerminal: get().cliTerminal,
   }
@@ -381,8 +396,10 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   themeMode: saved.themeMode,
   soundEnabled: saved.soundEnabled,
   expandedUI: saved.expandedUI,
+  pillScale: saved.pillScale,
   defaultModel: saved.defaultModel,
   cliTerminal: saved.cliTerminal,
+  settingsOpen: false,
   _systemIsDark: true,
   setIsDark: (isDark) => {
     set({ isDark })
@@ -402,6 +419,11 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     set({ expandedUI: expanded })
     saveSettings(snapshotSettings(get))
   },
+  setPillScale: (scale) => {
+    const clamped = Math.max(75, Math.min(150, scale))
+    set({ pillScale: clamped })
+    saveSettings(snapshotSettings(get))
+  },
   setDefaultModel: (modelId) => {
     const resolved = isKnownModelId(modelId) ? modelId : DEFAULT_MODEL_ID
     set({ defaultModel: resolved })
@@ -412,6 +434,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     set({ cliTerminal: app })
     saveSettings(snapshotSettings(get))
   },
+  toggleSettings: () => set((s) => ({ settingsOpen: !s.settingsOpen })),
   setSystemTheme: (isDark) => {
     set({ _systemIsDark: isDark })
     // Only apply if following system

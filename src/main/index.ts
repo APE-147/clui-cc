@@ -9,8 +9,10 @@ import { ensureSkills, type SkillStatus } from './skills/installer'
 import { fetchCatalog, listInstalled, installPlugin, uninstallPlugin } from './marketplace/catalog'
 import { log as _log, LOG_FILE, flushLogs } from './logger'
 import { getCliEnv } from './cli-env'
-import { shellSingleQuote } from './shell-utils'
 import { IPC } from '../shared/types'
+import { getSessionModel, setSessionModel } from './session-models'
+import { buildCliCommand, buildOpenTerminalAppleScript } from './open-terminal'
+import type { CliTerminalApp } from '../shared/types'
 import type { RunOptions, NormalizedEvent, EnrichedError } from '../shared/types'
 
 const DEBUG_MODE = process.env.CLUI_DEBUG === '1'
@@ -606,6 +608,31 @@ ipcMain.handle(IPC.LIST_SESSIONS, async (_e, projectPath?: string) => {
   }
 })
 
+const SESSION_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function validateSessionProjectPath(projectPath?: string): string | null {
+  const cwd = projectPath || process.cwd()
+  if (/[\0\r\n]/.test(cwd) || !cwd.startsWith('/')) return null
+  return cwd
+}
+
+ipcMain.handle(IPC.GET_SESSION_MODEL, (_e, arg: { sessionId: string; projectPath?: string }) => {
+  const { sessionId, projectPath } = arg
+  if (!SESSION_UUID_RE.test(sessionId)) return null
+  const cwd = validateSessionProjectPath(projectPath)
+  if (!cwd) return null
+  return getSessionModel(cwd, sessionId)
+})
+
+ipcMain.handle(IPC.SET_SESSION_MODEL, (_e, arg: { sessionId: string; projectPath?: string; modelId: string | null }) => {
+  const { sessionId, projectPath, modelId } = arg
+  if (!SESSION_UUID_RE.test(sessionId)) return false
+  const cwd = validateSessionProjectPath(projectPath)
+  if (!cwd) return false
+  setSessionModel(cwd, sessionId, modelId)
+  return true
+})
+
 // Load conversation history from a session's JSONL file
 ipcMain.handle(IPC.LOAD_SESSION, async (_e, arg: { sessionId: string; projectPath?: string } | string) => {
   const sessionId = typeof arg === 'string' ? arg : arg.sessionId
@@ -1072,65 +1099,60 @@ ipcMain.handle(IPC.GET_DIAGNOSTICS, () => {
   }
 })
 
-ipcMain.handle(IPC.OPEN_IN_TERMINAL, (_event, arg: string | null | { sessionId?: string | null; projectPath?: string }) => {
+ipcMain.handle(IPC.OPEN_IN_TERMINAL, (_event, arg: string | null | { sessionId?: string | null; projectPath?: string; terminalApp?: CliTerminalApp }) => {
   const { execFile } = require('child_process')
-  const claudeBin = 'claude'
+
+  if (process.platform !== 'darwin') {
+    log('OPEN_IN_TERMINAL: only supported on macOS')
+    return false
+  }
 
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-  // Support both old (string) and new ({ sessionId, projectPath }) calling convention
   let sessionId: string | null = null
   let projectPath: string = process.cwd()
+  let terminalApp: CliTerminalApp = 'terminal'
   if (typeof arg === 'string') {
     sessionId = arg
   } else if (arg && typeof arg === 'object') {
     sessionId = arg.sessionId ?? null
     projectPath = arg.projectPath && arg.projectPath !== '~' ? arg.projectPath : process.cwd()
+    if (arg.terminalApp === 'iterm' || arg.terminalApp === 'terminal') {
+      terminalApp = arg.terminalApp
+    }
   }
 
-  // Validate sessionId — must be a strict UUID to prevent injection into the shell command
   if (sessionId && !UUID_RE.test(sessionId)) {
     log(`OPEN_IN_TERMINAL: rejected invalid sessionId: ${sessionId}`)
     return false
   }
 
-  // Sanitize projectPath — reject null bytes, newlines, and non-absolute paths
   if (/[\0\r\n]/.test(projectPath) || !projectPath.startsWith('/')) {
     log(`OPEN_IN_TERMINAL: rejected invalid projectPath: ${projectPath}`)
     return false
   }
 
   // Write the shell command to a temp script file so no dynamic content is ever
-  // embedded in the AppleScript string. Terminal receives only the script file path
+  // embedded in the AppleScript string. The terminal receives only the script file path
   // (a safe constant-format string), eliminating all AppleScript injection surface.
   const { randomUUID } = require('crypto')
   const { tmpdir } = require('os')
   const scriptPath = join(tmpdir(), `clui-term-${randomUUID()}.sh`)
-
-  let shellCmd: string
-  if (sessionId) {
-    // sessionId is UUID-validated above — alphanumeric + hyphens, safe to embed directly
-    shellCmd = `cd ${shellSingleQuote(projectPath)} && ${claudeBin} --resume ${sessionId}`
-  } else {
-    shellCmd = `cd ${shellSingleQuote(projectPath)} && ${claudeBin}`
-  }
+  const shellCmd = buildCliCommand(projectPath, sessionId)
 
   try {
     writeFileSync(scriptPath, `#!/bin/sh\n${shellCmd}\n`, { mode: 0o700 })
-
-    // The AppleScript only contains the script file path (UUID-based, no user input).
-    // scriptPath is safe: it's /tmp/clui-term-<uuid>.sh — no special characters possible.
-    const appleScript = `tell application "Terminal"\n  activate\n  do script ${shellSingleQuote(scriptPath)}\nend tell`
+    const appleScript = buildOpenTerminalAppleScript(terminalApp, scriptPath)
 
     execFile('/usr/bin/osascript', ['-e', appleScript], (err: Error | null) => {
       // Clean up temp script after a short delay (Terminal needs time to read it)
       setTimeout(() => { try { unlinkSync(scriptPath) } catch {} }, 5000)
-      if (err) log(`Failed to open terminal: ${err.message}`)
-      else log(`Opened terminal with: ${shellCmd}`)
+      if (err) log(`Failed to open ${terminalApp}: ${err.message}`)
+      else log(`Opened ${terminalApp} with: ${shellCmd}`)
     })
     return true
   } catch (err: unknown) {
-    log(`Failed to open terminal: ${err}`)
+    log(`Failed to open ${terminalApp}: ${err}`)
     try { unlinkSync(scriptPath) } catch {}
     return false
   }

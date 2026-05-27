@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { DotsThree, Bell, ArrowsOutSimple, ArrowsHorizontal, Moon, Robot, Terminal, CaretDown, Check } from '@phosphor-icons/react'
 import { CLI_TERMINAL_OPTIONS, CODEX_REASONING_EFFORT_OPTIONS, useColors, useThemeStore } from '../theme'
 import { getEffectiveModel, getModelDisplayLabel, getModelsForProvider, useSessionStore } from '../stores/sessionStore'
-import { getDefaultModelForProvider } from '../models'
+import { getDefaultModelForProvider, resolveModelId } from '../models'
 import { UI_SCALE_OPTIONS } from '../layout'
-import type { ProviderInfo } from '../../shared/provider-types'
+import type { ProviderId, ProviderInfo } from '../../shared/provider-types'
 
 function RowToggle({
   checked,
@@ -182,10 +182,16 @@ export function SettingsContent() {
   const activeProvider = activeTab?.provider ?? defaultProvider
   const activeEndpoint = activeTab?.providerEndpoint ?? providerEndpoint
   const [endpointDraft, setEndpointDraft] = useState(activeEndpoint || '')
+  const [customModelDraft, setCustomModelDraft] = useState('')
   const codexAvailable = providers.some((p) => p.id === 'codex' && p.available)
-  const providerMode: ProviderMode = activeProvider === 'codex'
-    ? (activeEndpoint ? 'custom' : 'codex')
-    : 'claude'
+  const providerMode: ProviderMode =
+    activeProvider === 'openai-direct'
+      ? 'custom'
+      : activeProvider === 'codex'
+        ? 'codex'
+        : 'claude'
+  const isCustomProvider = activeProvider === 'openai-direct'
+  const isCodexBackedProvider = activeProvider === 'codex' || activeProvider === 'openai-direct'
   const providerOptions: Array<{ id: ProviderMode; label: string }> = [
     { id: 'claude', label: 'Claude' },
     ...(codexAvailable
@@ -198,8 +204,9 @@ export function SettingsContent() {
   const visibleModels = getModelsForProvider(activeProvider)
   const selectedModel = activeTab
     ? getEffectiveModel(activeTab, defaultModel)
-    : getDefaultModelForProvider(defaultProvider)
+    : resolveModelId(defaultModel, defaultProvider)
   const endpointIsValid = isValidEndpoint(endpointDraft)
+  const customModelIsValid = customModelDraft.trim().length > 0
 
   useEffect(() => {
     window.clui.listProviders()
@@ -212,7 +219,10 @@ export function SettingsContent() {
         if (!hasCodex) {
           const state = useSessionStore.getState()
           const currentTab = state.tabs.find((t) => t.id === state.activeTabId)
-          if (useThemeStore.getState().defaultProvider === 'codex' || currentTab?.provider === 'codex') {
+          const defaultProviderId = useThemeStore.getState().defaultProvider
+          const codexBackedDefault = defaultProviderId === 'codex' || defaultProviderId === 'openai-direct'
+          const codexBackedTab = currentTab?.provider === 'codex' || currentTab?.provider === 'openai-direct'
+          if (codexBackedDefault || codexBackedTab) {
             setDefaultProvider('claude')
             setDefaultModel(getDefaultModelForProvider('claude'))
             setProviderEndpoint('')
@@ -227,12 +237,17 @@ export function SettingsContent() {
     setEndpointDraft(activeEndpoint || '')
   }, [activeEndpoint])
 
+  useEffect(() => {
+    setCustomModelDraft(selectedModel)
+  }, [selectedModel])
+
   const applyProviderMode = (mode: ProviderMode) => {
     const endpoint = mode === 'custom' ? endpointDraft.trim() : ''
     if (mode === 'custom' && !isValidEndpoint(endpoint)) return
-    const provider = mode === 'claude' ? 'claude' : 'codex'
+    const provider: ProviderId = mode === 'claude' ? 'claude' : mode === 'custom' ? 'openai-direct' : 'codex'
+    const model = provider === activeProvider ? selectedModel : getDefaultModelForProvider(provider)
     setDefaultProvider(provider)
-    setDefaultModel(getDefaultModelForProvider(provider))
+    setDefaultModel(model)
     setProviderEndpoint(endpoint)
     if (activeTab) setTabProvider(provider, endpoint || null)
     setProviderMenuOpen(false)
@@ -246,6 +261,13 @@ export function SettingsContent() {
     const endpoint = endpointDraft.trim()
     setProviderEndpoint(endpoint)
     if (activeTab) setTabProviderEndpoint(endpoint || null)
+  }
+
+  const applyCustomModel = () => {
+    if (!isCustomProvider || !customModelIsValid) return
+    const model = customModelDraft.trim()
+    setDefaultModel(model)
+    if (activeTab) setTabModel(model)
   }
 
   return (
@@ -309,26 +331,28 @@ export function SettingsContent() {
             })}
           </div>
         )}
-        {activeProvider === 'codex' && (
+        {isCustomProvider && (
+          <input
+            value={endpointDraft}
+            onChange={(e) => setEndpointDraft(e.target.value)}
+            onBlur={applyEndpoint}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                applyEndpoint()
+                ;(e.currentTarget as HTMLInputElement).blur()
+              }
+            }}
+            placeholder="OpenAI-compatible base URL"
+            className="w-full mt-2 rounded-md px-2 py-1.5 text-[11px] outline-none"
+            style={{
+              color: colors.textSecondary,
+              background: colors.surfacePrimary,
+              border: `1px solid ${endpointIsValid ? colors.containerBorder : colors.statusError}`,
+            }}
+          />
+        )}
+        {isCodexBackedProvider && (
           <>
-            <input
-              value={endpointDraft}
-              onChange={(e) => setEndpointDraft(e.target.value)}
-              onBlur={applyEndpoint}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  applyEndpoint()
-                  ;(e.currentTarget as HTMLInputElement).blur()
-                }
-              }}
-              placeholder="OpenAI-compatible base URL"
-              className="w-full mt-2 rounded-md px-2 py-1.5 text-[11px] outline-none"
-              style={{
-                color: colors.textSecondary,
-                background: colors.surfacePrimary,
-                border: `1px solid ${endpointIsValid ? colors.containerBorder : colors.statusError}`,
-              }}
-            />
             <div className="mt-2">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
@@ -492,6 +516,7 @@ export function SettingsContent() {
                   onClick={() => {
                     setDefaultModel(m.id)
                     if (activeTab) setTabModel(m.id)
+                    setCustomModelDraft(m.id)
                     setModelMenuOpen(false)
                   }}
                   className="w-full flex items-center justify-between px-2.5 py-1.5 text-[11px] transition-colors"
@@ -507,6 +532,26 @@ export function SettingsContent() {
               )
             })}
           </div>
+        )}
+        {isCustomProvider && (
+          <input
+            value={customModelDraft}
+            onChange={(e) => setCustomModelDraft(e.target.value)}
+            onBlur={applyCustomModel}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                applyCustomModel()
+                ;(e.currentTarget as HTMLInputElement).blur()
+              }
+            }}
+            placeholder="Custom model id"
+            className="w-full mt-2 rounded-md px-2 py-1.5 text-[11px] outline-none"
+            style={{
+              color: colors.textSecondary,
+              background: colors.surfacePrimary,
+              border: `1px solid ${customModelIsValid ? colors.containerBorder : colors.statusError}`,
+            }}
+          />
         )}
       </div>
 

@@ -141,6 +141,7 @@ describe('ProviderRegistry', () => {
     expect(registry.resolve({ model: 'gpt-5.5' })).toBe(codex)
     expect(registry.resolve({ model: 'o3-pro' })).toBe(codex)
     expect(registry.resolve({ provider: 'codex', model: 'custom-model' })).toBe(codex)
+    expect(registry.resolve({ provider: 'openai-direct', model: 'llama-3.3-70b' })).toBe(codex)
     expect(registry.resolve({ model: 'my-local-llama' })).toBe(claude)
   })
 })

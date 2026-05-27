@@ -1,6 +1,6 @@
 import type { Message, TabState } from '../shared/types'
 import type { ProviderId } from '../shared/provider-types'
-import { isKnownModelId, isKnownModelIdForProvider } from './models'
+import { isKnownModelIdForProvider } from './models'
 
 const TABS_STORAGE_KEY = 'clui-open-tabs'
 const MAX_PERSISTED_TABS = 20
@@ -35,7 +35,7 @@ export function tabToSnapshot(tab: TabState): PersistedTabSnapshot {
     additionalDirs: [...tab.additionalDirs],
     modelOverride: tab.modelOverride && isKnownModelIdForProvider(tab.modelOverride, tab.provider) ? tab.modelOverride : null,
     provider: tab.provider,
-    providerEndpoint: normalizeEndpoint(tab.providerEndpoint),
+    providerEndpoint: tab.provider === 'openai-direct' ? normalizeEndpoint(tab.providerEndpoint) : null,
   }
 }
 
@@ -76,7 +76,7 @@ export function loadOpenTabs(): PersistedTabsState | null {
     const tabs = parsed.tabs.slice(0, MAX_PERSISTED_TABS).map((t) => {
       const provider = isProviderId(t.provider) ? t.provider : 'claude'
       const modelOverride =
-        typeof t.modelOverride === 'string' && isKnownModelId(t.modelOverride) && isKnownModelIdForProvider(t.modelOverride, provider)
+        typeof t.modelOverride === 'string' && isKnownModelIdForProvider(t.modelOverride, provider)
           ? t.modelOverride
           : null
 
@@ -93,7 +93,7 @@ export function loadOpenTabs(): PersistedTabsState | null {
           : [],
         modelOverride,
         provider,
-        providerEndpoint: provider === 'codex' ? normalizeEndpoint(t.providerEndpoint) : null,
+        providerEndpoint: provider === 'openai-direct' ? normalizeEndpoint(t.providerEndpoint) : null,
       }
     })
     const activeTabIndex =

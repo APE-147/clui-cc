@@ -161,7 +161,7 @@ function makeLocalTab(): TabState {
   return {
     id: crypto.randomUUID(),
     provider: theme.defaultProvider,
-    providerEndpoint: theme.defaultProvider === 'codex' ? (theme.providerEndpoint || null) : null,
+    providerEndpoint: theme.defaultProvider === 'openai-direct' ? (theme.providerEndpoint || null) : null,
     claudeSessionId: null,
     status: 'idle',
     activeRequestId: null,
@@ -274,7 +274,7 @@ export const useSessionStore = create<State>((set, get) => ({
 
   setTabProvider: (provider, providerEndpoint = null) => {
     const { activeTabId } = get()
-    const endpoint = provider === 'codex' ? (providerEndpoint?.trim() || null) : null
+    const endpoint = provider === 'openai-direct' ? (providerEndpoint?.trim() || null) : null
     window.clui.resetTabSession(activeTabId)
     set((s) => ({
       tabs: s.tabs.map((t) =>
@@ -302,7 +302,7 @@ export const useSessionStore = create<State>((set, get) => ({
     set((s) => ({
       tabs: s.tabs.map((t) =>
         t.id === activeTabId
-          ? { ...t, providerEndpoint: t.provider === 'codex' ? normalized : null }
+          ? { ...t, providerEndpoint: t.provider === 'openai-direct' ? normalized : null }
           : t,
       ),
     }))
@@ -761,7 +761,7 @@ export const useSessionStore = create<State>((set, get) => ({
       projectPath: resolvedPath,
       provider: tab.provider,
       providerEndpoint: tab.providerEndpoint || undefined,
-      reasoningEffort: tab.provider === 'codex' ? theme.codexReasoningEffort : undefined,
+      reasoningEffort: tab.provider === 'codex' || tab.provider === 'openai-direct' ? theme.codexReasoningEffort : undefined,
       sessionId: tab.claudeSessionId || undefined,
       model,
       addDirs: tab.additionalDirs.length > 0 ? tab.additionalDirs : undefined,

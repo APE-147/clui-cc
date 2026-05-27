@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Microphone, ArrowUp, SpinnerGap, X, Check } from '@phosphor-icons/react'
-import { useSessionStore, AVAILABLE_MODELS, getEffectiveModel, getModelDisplayLabel } from '../stores/sessionStore'
+import { useSessionStore, getEffectiveModel, getModelDisplayLabel, getModelsForProvider } from '../stores/sessionStore'
 import { useThemeStore } from '../theme'
 import { AttachmentChips } from './AttachmentChips'
 import { SlashCommandMenu, getFilteredCommandsWithExtras, type SlashCommand } from './SlashCommandMenu'
@@ -41,6 +41,7 @@ export function InputBar() {
   const setTabModel = useSessionStore((s) => s.setTabModel)
   const staticInfo = useSessionStore((s) => s.staticInfo)
   const defaultModel = useThemeStore((s) => s.defaultModel)
+  const defaultProvider = useThemeStore((s) => s.defaultProvider)
   const activeTabId = useSessionStore((s) => s.activeTabId)
   const tab = useSessionStore((s) => s.tabs.find((t) => t.id === s.activeTabId))
   const colors = useColors()
@@ -182,11 +183,14 @@ export function InputBar() {
         const version = tab?.sessionVersion || staticInfo?.version || null
         const current = tab ? getEffectiveModel(tab, defaultModel) : defaultModel
         const scope = tab?.modelOverride ? 'this session' : 'default (settings)'
-        const lines = AVAILABLE_MODELS.map((m) => {
+        const provider = tab?.provider ?? defaultProvider
+        const models = getModelsForProvider(provider)
+        const lines = models.map((m) => {
           const active = m.id === current
           return `  ${active ? '\u25CF' : '\u25CB'} ${m.label} (${m.id})`
         })
-        const header = version ? `Claude Code ${version}` : 'Claude Code'
+        const providerName = provider === 'openai-direct' ? 'Custom provider' : provider === 'codex' ? 'Codex' : 'Claude Code'
+        const header = version && provider === 'claude' ? `Claude Code ${version}` : providerName
         addSystemMessage(`${header}\n\nActive: ${getModelDisplayLabel(current)} (${scope})\n\n${lines.join('\n')}\n\nSwitch model for this session: /model <name>\n  e.g. /model sonnet`)
         break
       }
@@ -228,7 +232,7 @@ export function InputBar() {
         break
       }
     }
-  }, [tab, clearTab, addSystemMessage, staticInfo, defaultModel])
+  }, [tab, clearTab, addSystemMessage, staticInfo, defaultModel, defaultProvider])
 
   const handleSlashSelect = useCallback((cmd: SlashCommand) => {
     const isSkillCommand = !!tab?.sessionSkills?.includes(cmd.command.replace(/^\//, ''))
@@ -255,8 +259,11 @@ export function InputBar() {
     const prompt = input.trim()
     const modelMatch = prompt.match(/^\/model\s+(\S+)/i)
     if (modelMatch) {
-      const query = modelMatch[1].toLowerCase()
-      const match = AVAILABLE_MODELS.find((m: { id: string; label: string }) =>
+      const provider = tab?.provider ?? defaultProvider
+      const models = getModelsForProvider(provider)
+      const requestedModel = modelMatch[1].trim()
+      const query = requestedModel.toLowerCase()
+      const match = models.find((m: { id: string; label: string }) =>
         m.id.toLowerCase().includes(query) || m.label.toLowerCase().includes(query)
       )
       if (match) {
@@ -264,10 +271,15 @@ export function InputBar() {
         setInput('')
         setSlashFilter(null)
         addSystemMessage(`Model switched to ${match.label} (${match.id})`)
+      } else if (provider === 'openai-direct' && requestedModel) {
+        setTabModel(requestedModel)
+        setInput('')
+        setSlashFilter(null)
+        addSystemMessage(`Model switched to ${getModelDisplayLabel(requestedModel)} (${requestedModel})`)
       } else {
         setInput('')
         setSlashFilter(null)
-        addSystemMessage(`Unknown model "${modelMatch[1]}". Available: opus, sonnet, haiku`)
+        addSystemMessage(`Unknown model "${modelMatch[1]}". Available: ${models.map((m) => m.id).join(', ')}`)
       }
       return
     }
@@ -281,7 +293,7 @@ export function InputBar() {
     sendMessage(prompt || 'See attached files')
     // Refocus after React re-renders from the state update
     requestAnimationFrame(() => textareaRef.current?.focus())
-  }, [input, isBusy, sendMessage, attachments.length, showSlashMenu, slashFilter, slashIndex, handleSlashSelect])
+  }, [input, isBusy, sendMessage, attachments.length, showSlashMenu, slashFilter, slashIndex, handleSlashSelect, tab, defaultProvider, setTabModel, addSystemMessage])
 
   // ─── Keyboard ───
   const handleKeyDown = (e: React.KeyboardEvent) => {

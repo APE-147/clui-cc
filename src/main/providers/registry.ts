@@ -16,6 +16,7 @@ export class ProviderRegistry {
   }
 
   resolve(options: { provider?: ProviderId; model?: string | null }): ProviderDefinition {
+    if (options.provider === 'openai-direct') return this.providers.get('codex') || this.get('claude')
     if (options.provider && this.providers.has(options.provider)) return this.get(options.provider)
 
     const model = options.model || ''

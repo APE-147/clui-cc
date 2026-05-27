@@ -16,29 +16,43 @@ export const CODEX_MODELS = [
   { id: 'o4-mini', label: 'o4 Mini' },
 ] as const
 
+export const CUSTOM_PROVIDER_MODELS = [
+  { id: 'gpt-4o', label: 'GPT 4o' },
+  { id: 'gpt-4o-mini', label: 'GPT 4o Mini' },
+  { id: 'gpt-4.1', label: 'GPT 4.1' },
+  { id: 'gpt-4.1-mini', label: 'GPT 4.1 Mini' },
+  { id: 'gpt-5', label: 'GPT 5' },
+  { id: 'gpt-5.5', label: 'GPT 5.5' },
+  { id: 'o3-pro', label: 'o3 Pro' },
+  { id: 'o4-mini', label: 'o4 Mini' },
+] as const
+
 export const PROVIDER_MODELS: Record<ProviderId, readonly ModelOption[]> = {
   claude: CLAUDE_MODELS,
   codex: CODEX_MODELS,
-  'openai-direct': CODEX_MODELS,
+  'openai-direct': CUSTOM_PROVIDER_MODELS,
 }
 
 export const AVAILABLE_MODELS = CLAUDE_MODELS
 export const DEFAULT_MODEL_ID = CLAUDE_MODELS[0].id
 export const DEFAULT_PROVIDER_ID: ProviderId = 'claude'
 
-export type ModelId = (typeof CLAUDE_MODELS)[number]['id'] | (typeof CODEX_MODELS)[number]['id']
+export type ModelId =
+  | (typeof CLAUDE_MODELS)[number]['id']
+  | (typeof CODEX_MODELS)[number]['id']
+  | (typeof CUSTOM_PROVIDER_MODELS)[number]['id']
 
 function normalizeModelId(modelId: string): string {
   return modelId.replace(/\[[^\]]+\]/g, '').trim()
 }
 
 export function isKnownModelId(modelId: string): boolean {
-  const normalized = normalizeModelId(modelId)
-  return Object.values(PROVIDER_MODELS).some((models) => models.some((m) => m.id === normalized))
+  return normalizeModelId(modelId).length > 0
 }
 
 export function isKnownModelIdForProvider(modelId: string, provider: ProviderId): boolean {
   const normalized = normalizeModelId(modelId)
+  if (provider === 'openai-direct') return normalized.length > 0
   return PROVIDER_MODELS[provider].some((m) => m.id === normalized)
 }
 

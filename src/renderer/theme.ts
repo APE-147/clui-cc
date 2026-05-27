@@ -4,6 +4,7 @@
  */
 import { create } from 'zustand'
 import { DEFAULT_MODEL_ID, DEFAULT_PROVIDER_ID, isKnownModelId } from './models'
+import { normalizeUiScale } from './layout'
 import type { CliTerminalApp } from '../shared/types'
 import type { CodexReasoningEffort, ProviderId } from '../shared/provider-types'
 
@@ -381,7 +382,7 @@ function loadSettings(): PersistedSettings {
     const raw = localStorage.getItem(SETTINGS_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      const pillScale = typeof parsed.pillScale === 'number' ? Math.max(75, Math.min(150, parsed.pillScale)) : 100
+      const pillScale = normalizeUiScale(parsed.pillScale)
       return {
         themeMode: ['light', 'dark'].includes(parsed.themeMode) ? parsed.themeMode : 'dark',
         soundEnabled: typeof parsed.soundEnabled === 'boolean' ? parsed.soundEnabled : true,
@@ -460,8 +461,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     saveSettings(snapshotSettings(get))
   },
   setPillScale: (scale) => {
-    const clamped = Math.max(75, Math.min(150, scale))
-    set({ pillScale: clamped })
+    set({ pillScale: normalizeUiScale(scale) })
     saveSettings(snapshotSettings(get))
   },
   setDefaultModel: (modelId) => {

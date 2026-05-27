@@ -13,6 +13,7 @@ import { useClaudeEvents } from './hooks/useClaudeEvents'
 import { useHealthReconciliation } from './hooks/useHealthReconciliation'
 import { useSessionStore } from './stores/sessionStore'
 import { useColors, useThemeStore, spacing } from './theme'
+import { getScaledLayout } from './layout'
 
 const TRANSITION = { duration: 0.26, ease: [0.4, 0, 0.1, 1] as const }
 const PANEL_TRANSITION = { duration: 0.18, ease: [0.4, 0, 0.1, 1] as const }
@@ -181,15 +182,19 @@ export default function App() {
   const isRunning = activeTabStatus === 'running' || activeTabStatus === 'connecting'
 
   const pillScale = useThemeStore((s) => s.pillScale)
-  const scale = pillScale / 100
 
-  // Layout dimensions — expandedUI widens and heightens the panel, pillScale scales horizontally
-  // Layout dimensions — no caps needed, window fills display workArea
-  const contentWidth = Math.round((expandedUI ? 700 : spacing.contentWidth) * scale)
-  const cardExpandedWidth = Math.round((expandedUI ? 700 : 460) * scale)
-  const cardCollapsedWidth = Math.round((expandedUI ? 670 : 430) * scale)
+  const {
+    contentWidth,
+    cardExpandedWidth,
+    cardCollapsedWidth,
+    bodyMaxHeight,
+    columnTransform,
+  } = getScaledLayout({
+    expandedUI,
+    contentWidth: spacing.contentWidth,
+    uiScale: pillScale,
+  })
   const cardCollapsedMargin = 15
-  const bodyMaxHeight = expandedUI ? 520 : 400
 
   // Mutual exclusion: when settings opens, close history + marketplace + collapse chat
   useEffect(() => {
@@ -257,7 +262,17 @@ export default function App() {
       <div className="flex flex-col justify-end h-full" style={{ background: 'transparent', paddingBottom: 'var(--clui-dock-margin, 24px)' }}>
 
         {/* ─── 460px content column, centered. Circles overflow left. ─── */}
-        <div data-clui-column style={{ width: contentWidth, position: 'relative', margin: '0 auto', transition: 'width 0.08s linear', transform: 'translateY(var(--clui-card-y, 0px))' }}>
+        <div
+          data-clui-column
+          style={{
+            width: contentWidth,
+            position: 'relative',
+            margin: '0 auto',
+            transition: 'width 0.08s linear, transform 0.14s ease-out',
+            transform: columnTransform,
+            transformOrigin: 'bottom center',
+          }}
+        >
 
           <AnimatePresence initial={false}>
             {marketplaceOpen && (

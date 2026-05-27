@@ -3,6 +3,7 @@ import { DotsThree, Bell, ArrowsOutSimple, ArrowsHorizontal, Moon, Robot, Termin
 import { CLI_TERMINAL_OPTIONS, CODEX_REASONING_EFFORT_OPTIONS, useColors, useThemeStore } from '../theme'
 import { getEffectiveModel, getModelDisplayLabel, getModelsForProvider, useSessionStore } from '../stores/sessionStore'
 import { getDefaultModelForProvider } from '../models'
+import { UI_SCALE_OPTIONS } from '../layout'
 import type { ProviderInfo } from '../../shared/provider-types'
 
 function RowToggle({
@@ -39,16 +40,10 @@ function RowToggle({
   )
 }
 
-function PillScaleSlider() {
+function UIScaleControl() {
   const pillScale = useThemeStore((s) => s.pillScale)
   const setPillScale = useThemeStore((s) => s.setPillScale)
   const colors = useColors()
-  const [local, setLocal] = useState(pillScale)
-  const [dragging, setDragging] = useState(false)
-
-  useEffect(() => {
-    if (!dragging) setLocal(pillScale)
-  }, [pillScale, dragging])
 
   return (
     <div>
@@ -59,40 +54,32 @@ function PillScaleSlider() {
             Scale
           </div>
         </div>
-        <div
-          className="text-[11px] font-medium tabular-nums rounded-full px-2 py-0.5"
-          style={{ color: colors.textSecondary, border: `1px solid ${colors.containerBorder}` }}
-        >
-          {local}%
+        <div className="flex items-center gap-1">
+          {UI_SCALE_OPTIONS.map((scale) => {
+            const selected = pillScale === scale
+            return (
+              <button
+                key={scale}
+                type="button"
+                onClick={() => {
+                  setPillScale(scale)
+                  window.dispatchEvent(new CustomEvent('clui-scale-start'))
+                  window.dispatchEvent(new CustomEvent('clui-scale-done'))
+                }}
+                className="text-[11px] font-medium tabular-nums rounded-full px-2 py-0.5 transition-colors"
+                style={{
+                  color: selected ? colors.textPrimary : colors.textTertiary,
+                  background: selected ? colors.surfaceSecondary : 'transparent',
+                  border: `1px solid ${selected ? colors.containerBorder : 'transparent'}`,
+                }}
+                aria-pressed={selected}
+              >
+                {scale}%
+              </button>
+            )
+          })}
         </div>
       </div>
-      <input
-        type="range"
-        min={75}
-        max={150}
-        step={5}
-        value={local}
-        onChange={(e) => {
-          const v = Number(e.target.value)
-          setLocal(v)
-          setPillScale(v)
-          const expanded = useThemeStore.getState().expandedUI
-          if (v >= 150 && !expanded) useThemeStore.getState().setExpandedUI(true)
-          if (v < 150 && expanded) useThemeStore.getState().setExpandedUI(false)
-        }}
-        onPointerDown={() => {
-          setDragging(true)
-          window.dispatchEvent(new CustomEvent('clui-scale-start'))
-          // Use window-level listener so pointerUp fires even if released outside the slider
-          const onUp = () => {
-            setDragging(false)
-            window.dispatchEvent(new CustomEvent('clui-scale-done'))
-          }
-          window.addEventListener('pointerup', onUp, { once: true })
-        }}
-        className="w-full mt-1 cursor-pointer"
-        style={{ accentColor: colors.accent, height: 4 }}
-      />
     </div>
   )
 }
@@ -116,7 +103,6 @@ export function SettingsContent() {
   const setThemeMode = useThemeStore((s) => s.setThemeMode)
   const expandedUI = useThemeStore((s) => s.expandedUI)
   const setExpandedUI = useThemeStore((s) => s.setExpandedUI)
-  const setPillScale = useThemeStore((s) => s.setPillScale)
   const defaultModel = useThemeStore((s) => s.defaultModel)
   const setDefaultModel = useThemeStore((s) => s.setDefaultModel)
   const defaultProvider = useThemeStore((s) => s.defaultProvider)
@@ -210,7 +196,7 @@ export function SettingsContent() {
 
   return (
     <div className="p-3 flex flex-col gap-2.5">
-      <PillScaleSlider />
+      <UIScaleControl />
 
       <div style={{ height: 1, background: colors.popoverBorder }} />
 
@@ -362,10 +348,7 @@ export function SettingsContent() {
           </div>
           <RowToggle
             checked={expandedUI}
-            onChange={(next) => {
-              setExpandedUI(next)
-              setPillScale(next ? 150 : 100)
-            }}
+            onChange={setExpandedUI}
             colors={colors}
             label="Toggle full width panel"
           />

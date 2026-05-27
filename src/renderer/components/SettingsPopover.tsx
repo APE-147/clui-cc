@@ -76,6 +76,7 @@ function PillScaleSlider() {
         onPointerDown={() => {
           setDragging(true)
           window.dispatchEvent(new CustomEvent('clui-scale-start'))
+          // Use window-level listener so pointerUp fires even if released outside the slider
           const onUp = () => {
             setDragging(false)
             window.dispatchEvent(new CustomEvent('clui-scale-done'))

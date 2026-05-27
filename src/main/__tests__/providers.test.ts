@@ -58,6 +58,20 @@ describe('CodexProvider', () => {
     ])
   })
 
+  it('passes Codex reasoning effort as a config override', () => {
+    const provider = new CodexProvider()
+
+    const args = provider.buildArgs({
+      prompt: 'think',
+      projectPath: '/tmp/project',
+      model: 'gpt-5.5',
+      reasoningEffort: 'xhigh',
+    })
+
+    expect(args).toContain('-c')
+    expect(args).toContain('model_reasoning_effort="xhigh"')
+  })
+
   it('normalizes Codex JSONL events into CLUI events', () => {
     const provider = new CodexProvider()
 

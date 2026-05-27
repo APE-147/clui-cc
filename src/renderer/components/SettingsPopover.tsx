@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { DotsThree, Bell, ArrowsOutSimple, ArrowsHorizontal, Moon, Robot, Terminal, CaretDown, Check } from '@phosphor-icons/react'
-import { CLI_TERMINAL_OPTIONS, useColors, useThemeStore } from '../theme'
+import { CLI_TERMINAL_OPTIONS, CODEX_REASONING_EFFORT_OPTIONS, useColors, useThemeStore } from '../theme'
 import { getEffectiveModel, getModelDisplayLabel, getModelsForProvider, useSessionStore } from '../stores/sessionStore'
 import { getDefaultModelForProvider } from '../models'
 import type { ProviderInfo } from '../../shared/provider-types'
@@ -56,10 +56,15 @@ function PillScaleSlider() {
         <div className="flex items-center gap-2 min-w-0">
           <ArrowsHorizontal size={14} style={{ color: colors.textTertiary }} />
           <div className="text-[12px] font-medium" style={{ color: colors.textPrimary }}>
-            Width
+            Scale
           </div>
         </div>
-        <div className="text-[11px]" style={{ color: colors.textTertiary }}>{local}%</div>
+        <div
+          className="text-[11px] font-medium tabular-nums rounded-full px-2 py-0.5"
+          style={{ color: colors.textSecondary, border: `1px solid ${colors.containerBorder}` }}
+        >
+          {local}%
+        </div>
       </div>
       <input
         type="range"
@@ -118,6 +123,8 @@ export function SettingsContent() {
   const setDefaultProvider = useThemeStore((s) => s.setDefaultProvider)
   const providerEndpoint = useThemeStore((s) => s.providerEndpoint)
   const setProviderEndpoint = useThemeStore((s) => s.setProviderEndpoint)
+  const codexReasoningEffort = useThemeStore((s) => s.codexReasoningEffort)
+  const setCodexReasoningEffort = useThemeStore((s) => s.setCodexReasoningEffort)
   const cliTerminal = useThemeStore((s) => s.cliTerminal)
   const setCliTerminal = useThemeStore((s) => s.setCliTerminal)
   const activeTab = useSessionStore((s) => s.tabs.find((t) => t.id === s.activeTabId))
@@ -126,6 +133,7 @@ export function SettingsContent() {
   const setTabProviderEndpoint = useSessionStore((s) => s.setTabProviderEndpoint)
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
   const [providerMenuOpen, setProviderMenuOpen] = useState(false)
+  const [reasoningMenuOpen, setReasoningMenuOpen] = useState(false)
   const [cliMenuOpen, setCliMenuOpen] = useState(false)
   const [providers, setProviders] = useState<ProviderInfo[]>([
     { id: 'claude', displayName: 'Claude Code', available: true, supportsResume: true, supportsPermissions: true },
@@ -189,6 +197,7 @@ export function SettingsContent() {
     if (activeTab) setTabProvider(provider, endpoint || null)
     setProviderMenuOpen(false)
     setModelMenuOpen(false)
+    setReasoningMenuOpen(false)
     setCliMenuOpen(false)
   }
 
@@ -218,6 +227,7 @@ export function SettingsContent() {
             onClick={() => {
               setProviderMenuOpen((o) => !o)
               setModelMenuOpen(false)
+              setReasoningMenuOpen(false)
               setCliMenuOpen(false)
             }}
             className="flex items-center gap-0.5 text-[11px] rounded-full px-2 py-0.5 transition-colors"
@@ -259,24 +269,84 @@ export function SettingsContent() {
           </div>
         )}
         {activeProvider === 'codex' && (
-          <input
-            value={endpointDraft}
-            onChange={(e) => setEndpointDraft(e.target.value)}
-            onBlur={applyEndpoint}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                applyEndpoint()
-                ;(e.currentTarget as HTMLInputElement).blur()
-              }
-            }}
-            placeholder="OpenAI-compatible base URL"
-            className="w-full mt-2 rounded-md px-2 py-1.5 text-[11px] outline-none"
-            style={{
-              color: colors.textSecondary,
-              background: colors.surfacePrimary,
-              border: `1px solid ${endpointIsValid ? colors.containerBorder : colors.statusError}`,
-            }}
-          />
+          <>
+            <input
+              value={endpointDraft}
+              onChange={(e) => setEndpointDraft(e.target.value)}
+              onBlur={applyEndpoint}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  applyEndpoint()
+                  ;(e.currentTarget as HTMLInputElement).blur()
+                }
+              }}
+              placeholder="OpenAI-compatible base URL"
+              className="w-full mt-2 rounded-md px-2 py-1.5 text-[11px] outline-none"
+              style={{
+                color: colors.textSecondary,
+                background: colors.surfacePrimary,
+                border: `1px solid ${endpointIsValid ? colors.containerBorder : colors.statusError}`,
+              }}
+            />
+            <div className="mt-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Robot size={14} style={{ color: colors.textTertiary }} />
+                  <div className="text-[12px] font-medium" style={{ color: colors.textPrimary }}>
+                    Reasoning
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReasoningMenuOpen((o) => !o)
+                    setProviderMenuOpen(false)
+                    setModelMenuOpen(false)
+                    setCliMenuOpen(false)
+                  }}
+                  className="flex items-center gap-0.5 text-[11px] rounded-full px-2 py-0.5 transition-colors"
+                  style={{ color: colors.textSecondary, border: `1px solid ${colors.containerBorder}` }}
+                  aria-expanded={reasoningMenuOpen}
+                  aria-haspopup="listbox"
+                >
+                  {CODEX_REASONING_EFFORT_OPTIONS.find((o) => o.id === codexReasoningEffort)?.label ?? 'Medium'}
+                  <CaretDown size={10} style={{ opacity: 0.6 }} />
+                </button>
+              </div>
+              {reasoningMenuOpen && (
+                <div
+                  className="mt-2 rounded-lg overflow-hidden"
+                  style={{ border: `1px solid ${colors.popoverBorder}` }}
+                  role="listbox"
+                >
+                  {CODEX_REASONING_EFFORT_OPTIONS.map((o) => {
+                    const isSelected = codexReasoningEffort === o.id
+                    return (
+                      <button
+                        key={o.id}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        onClick={() => {
+                          setCodexReasoningEffort(o.id)
+                          setReasoningMenuOpen(false)
+                        }}
+                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-[11px] transition-colors"
+                        style={{
+                          color: isSelected ? colors.textPrimary : colors.textSecondary,
+                          fontWeight: isSelected ? 600 : 400,
+                          background: isSelected ? colors.surfaceSecondary : 'transparent',
+                        }}
+                      >
+                        {o.label}
+                        {isSelected && <Check size={12} style={{ color: colors.accent }} />}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
@@ -355,6 +425,7 @@ export function SettingsContent() {
             onClick={() => {
               setModelMenuOpen((o) => !o)
               setProviderMenuOpen(false)
+              setReasoningMenuOpen(false)
               setCliMenuOpen(false)
             }}
             className="flex items-center gap-0.5 text-[11px] rounded-full px-2 py-0.5 transition-colors"
@@ -417,6 +488,7 @@ export function SettingsContent() {
               setCliMenuOpen((o) => !o)
               setModelMenuOpen(false)
               setProviderMenuOpen(false)
+              setReasoningMenuOpen(false)
             }}
             className="flex items-center gap-0.5 text-[11px] rounded-full px-2 py-0.5 transition-colors"
             style={{ color: colors.textSecondary, border: `1px solid ${colors.containerBorder}` }}

@@ -754,13 +754,14 @@ export const useSessionStore = create<State>((set, get) => ({
     }))
 
     // Send to backend — ControlPlane will queue if a run is active
-    const defaultModel = useThemeStore.getState().defaultModel
-    const model = getEffectiveModel(tab, defaultModel)
+    const theme = useThemeStore.getState()
+    const model = getEffectiveModel(tab, theme.defaultModel)
     window.clui.prompt(activeTabId, requestId, {
       prompt: fullPrompt,
       projectPath: resolvedPath,
       provider: tab.provider,
       providerEndpoint: tab.providerEndpoint || undefined,
+      reasoningEffort: tab.provider === 'codex' ? theme.codexReasoningEffort : undefined,
       sessionId: tab.claudeSessionId || undefined,
       model,
       addDirs: tab.additionalDirs.length > 0 ? tab.additionalDirs : undefined,

@@ -57,6 +57,9 @@ export class CodexProvider implements ProviderDefinition {
   buildArgs(options: RunOptions): string[] {
     const args = ['exec', '--json']
     if (options.model) args.push('-m', options.model)
+    if (options.reasoningEffort) {
+      args.push('-c', `model_reasoning_effort=${JSON.stringify(options.reasoningEffort)}`)
+    }
     args.push('-s', 'danger-full-access')
     args.push('--skip-git-repo-check')
     if (options.providerEndpoint) {

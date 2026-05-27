@@ -1,4 +1,4 @@
-import type { ProviderId } from './provider-types'
+import type { CodexReasoningEffort, ProviderId } from './provider-types'
 
 // ─── Claude Code Stream Event Types (verified from v2.1.63) ───
 
@@ -220,6 +220,7 @@ export interface RunOptions {
   provider?: ProviderId
   providerEndpoint?: string
   providerApiKeyEnvVar?: string
+  reasoningEffort?: CodexReasoningEffort
   sessionId?: string
   allowedTools?: string[]
   maxTurns?: number

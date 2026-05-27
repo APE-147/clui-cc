@@ -5,7 +5,7 @@
 import { create } from 'zustand'
 import { DEFAULT_MODEL_ID, DEFAULT_PROVIDER_ID, isKnownModelId } from './models'
 import type { CliTerminalApp } from '../shared/types'
-import type { ProviderId } from '../shared/provider-types'
+import type { CodexReasoningEffort, ProviderId } from '../shared/provider-types'
 
 export type { CliTerminalApp }
 
@@ -14,8 +14,19 @@ export const CLI_TERMINAL_OPTIONS: { id: CliTerminalApp; label: string }[] = [
   { id: 'iterm', label: 'iTerm' },
 ]
 
+export const CODEX_REASONING_EFFORT_OPTIONS: { id: CodexReasoningEffort; label: string }[] = [
+  { id: 'low', label: 'Low' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'high', label: 'High' },
+  { id: 'xhigh', label: 'XHigh' },
+]
+
 function isCliTerminalApp(value: unknown): value is CliTerminalApp {
   return value === 'terminal' || value === 'iterm'
+}
+
+function isCodexReasoningEffort(value: unknown): value is CodexReasoningEffort {
+  return value === 'low' || value === 'medium' || value === 'high' || value === 'xhigh'
 }
 
 // ─── Color palettes ───
@@ -306,6 +317,8 @@ interface ThemeState {
   defaultProvider: ProviderId
   /** Optional OpenAI-compatible endpoint used by Codex-backed providers */
   providerEndpoint: string
+  /** Codex CLI model_reasoning_effort override */
+  codexReasoningEffort: CodexReasoningEffort
   /** macOS app for "Open in CLI" */
   cliTerminal: CliTerminalApp
   settingsOpen: boolean
@@ -319,6 +332,7 @@ interface ThemeState {
   setDefaultModel: (modelId: string) => void
   setDefaultProvider: (provider: ProviderId) => void
   setProviderEndpoint: (endpoint: string) => void
+  setCodexReasoningEffort: (effort: CodexReasoningEffort) => void
   setCliTerminal: (app: CliTerminalApp) => void
   toggleSettings: () => void
   /** Called by OS theme change listener — updates system value */
@@ -354,6 +368,7 @@ type PersistedSettings = {
   defaultModel: string
   defaultProvider: ProviderId
   providerEndpoint: string
+  codexReasoningEffort: CodexReasoningEffort
   cliTerminal: CliTerminalApp
 }
 
@@ -375,6 +390,7 @@ function loadSettings(): PersistedSettings {
         defaultModel: isKnownModelId(parsed.defaultModel) ? parsed.defaultModel : DEFAULT_MODEL_ID,
         defaultProvider: isProviderId(parsed.defaultProvider) ? parsed.defaultProvider : DEFAULT_PROVIDER_ID,
         providerEndpoint: typeof parsed.providerEndpoint === 'string' ? parsed.providerEndpoint : '',
+        codexReasoningEffort: isCodexReasoningEffort(parsed.codexReasoningEffort) ? parsed.codexReasoningEffort : 'medium',
         cliTerminal: isCliTerminalApp(parsed.cliTerminal) ? parsed.cliTerminal : 'terminal',
       }
     }
@@ -387,6 +403,7 @@ function loadSettings(): PersistedSettings {
     defaultModel: DEFAULT_MODEL_ID,
     defaultProvider: DEFAULT_PROVIDER_ID,
     providerEndpoint: '',
+    codexReasoningEffort: 'medium',
     cliTerminal: 'terminal',
   }
 }
@@ -404,6 +421,7 @@ function snapshotSettings(get: () => ThemeState): PersistedSettings {
     defaultModel: get().defaultModel,
     defaultProvider: get().defaultProvider,
     providerEndpoint: get().providerEndpoint,
+    codexReasoningEffort: get().codexReasoningEffort,
     cliTerminal: get().cliTerminal,
   }
 }
@@ -419,6 +437,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   defaultModel: saved.defaultModel,
   defaultProvider: saved.defaultProvider,
   providerEndpoint: saved.providerEndpoint,
+  codexReasoningEffort: saved.codexReasoningEffort,
   cliTerminal: saved.cliTerminal,
   settingsOpen: false,
   _systemIsDark: true,
@@ -457,6 +476,11 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   },
   setProviderEndpoint: (endpoint) => {
     set({ providerEndpoint: endpoint.trim() })
+    saveSettings(snapshotSettings(get))
+  },
+  setCodexReasoningEffort: (effort) => {
+    if (!isCodexReasoningEffort(effort)) return
+    set({ codexReasoningEffort: effort })
     saveSettings(snapshotSettings(get))
   },
   setCliTerminal: (app) => {

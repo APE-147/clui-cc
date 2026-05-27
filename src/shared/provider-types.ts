@@ -1,6 +1,7 @@
 import type { NormalizedEvent, RunOptions } from './types'
 
 export type ProviderId = 'claude' | 'codex' | 'openai-direct'
+export type CodexReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh'
 
 /**
  * Runtime adapter for an agent CLI/provider.

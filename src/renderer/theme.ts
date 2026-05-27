@@ -3,8 +3,9 @@
  * Colors derived from ChatCN oklch system and design-fixed.html reference.
  */
 import { create } from 'zustand'
-import { DEFAULT_MODEL_ID, isKnownModelId } from './models'
+import { DEFAULT_MODEL_ID, DEFAULT_PROVIDER_ID, isKnownModelId } from './models'
 import type { CliTerminalApp } from '../shared/types'
+import type { ProviderId } from '../shared/provider-types'
 
 export type { CliTerminalApp }
 
@@ -301,6 +302,10 @@ interface ThemeState {
   pillScale: number
   /** Global default model for new sessions (per-session overrides live on TabState) */
   defaultModel: string
+  /** Global default provider for new tabs */
+  defaultProvider: ProviderId
+  /** Optional OpenAI-compatible endpoint used by Codex-backed providers */
+  providerEndpoint: string
   /** macOS app for "Open in CLI" */
   cliTerminal: CliTerminalApp
   settingsOpen: boolean
@@ -312,6 +317,8 @@ interface ThemeState {
   setExpandedUI: (expanded: boolean) => void
   setPillScale: (scale: number) => void
   setDefaultModel: (modelId: string) => void
+  setDefaultProvider: (provider: ProviderId) => void
+  setProviderEndpoint: (endpoint: string) => void
   setCliTerminal: (app: CliTerminalApp) => void
   toggleSettings: () => void
   /** Called by OS theme change listener — updates system value */
@@ -345,7 +352,13 @@ type PersistedSettings = {
   expandedUI: boolean
   pillScale: number
   defaultModel: string
+  defaultProvider: ProviderId
+  providerEndpoint: string
   cliTerminal: CliTerminalApp
+}
+
+function isProviderId(value: unknown): value is ProviderId {
+  return value === 'claude' || value === 'codex' || value === 'openai-direct'
 }
 
 function loadSettings(): PersistedSettings {
@@ -360,6 +373,8 @@ function loadSettings(): PersistedSettings {
         expandedUI: typeof parsed.expandedUI === 'boolean' ? parsed.expandedUI : false,
         pillScale,
         defaultModel: isKnownModelId(parsed.defaultModel) ? parsed.defaultModel : DEFAULT_MODEL_ID,
+        defaultProvider: isProviderId(parsed.defaultProvider) ? parsed.defaultProvider : DEFAULT_PROVIDER_ID,
+        providerEndpoint: typeof parsed.providerEndpoint === 'string' ? parsed.providerEndpoint : '',
         cliTerminal: isCliTerminalApp(parsed.cliTerminal) ? parsed.cliTerminal : 'terminal',
       }
     }
@@ -370,6 +385,8 @@ function loadSettings(): PersistedSettings {
     expandedUI: false,
     pillScale: 100,
     defaultModel: DEFAULT_MODEL_ID,
+    defaultProvider: DEFAULT_PROVIDER_ID,
+    providerEndpoint: '',
     cliTerminal: 'terminal',
   }
 }
@@ -385,6 +402,8 @@ function snapshotSettings(get: () => ThemeState): PersistedSettings {
     expandedUI: get().expandedUI,
     pillScale: get().pillScale,
     defaultModel: get().defaultModel,
+    defaultProvider: get().defaultProvider,
+    providerEndpoint: get().providerEndpoint,
     cliTerminal: get().cliTerminal,
   }
 }
@@ -398,6 +417,8 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   expandedUI: saved.expandedUI,
   pillScale: saved.pillScale,
   defaultModel: saved.defaultModel,
+  defaultProvider: saved.defaultProvider,
+  providerEndpoint: saved.providerEndpoint,
   cliTerminal: saved.cliTerminal,
   settingsOpen: false,
   _systemIsDark: true,
@@ -427,6 +448,15 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   setDefaultModel: (modelId) => {
     const resolved = isKnownModelId(modelId) ? modelId : DEFAULT_MODEL_ID
     set({ defaultModel: resolved })
+    saveSettings(snapshotSettings(get))
+  },
+  setDefaultProvider: (provider) => {
+    if (!isProviderId(provider)) return
+    set({ defaultProvider: provider })
+    saveSettings(snapshotSettings(get))
+  },
+  setProviderEndpoint: (endpoint) => {
+    set({ providerEndpoint: endpoint.trim() })
     saveSettings(snapshotSettings(get))
   },
   setCliTerminal: (app) => {

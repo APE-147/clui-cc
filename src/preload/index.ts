@@ -1,11 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../shared/types'
 import type { RunOptions, NormalizedEvent, HealthReport, EnrichedError, Attachment, SessionMeta, CatalogPlugin, SessionLoadMessage, CliTerminalApp } from '../shared/types'
+import type { ProviderInfo } from '../shared/provider-types'
 
 export interface CluiAPI {
   // ─── Request-response (renderer → main) ───
   start(): Promise<{ version: string; auth: { email?: string; subscriptionType?: string; authMethod?: string }; mcpServers: string[]; projectPath: string; homePath: string }>
   createTab(): Promise<{ tabId: string }>
+  listProviders(): Promise<ProviderInfo[]>
   prompt(tabId: string, requestId: string, options: RunOptions): Promise<void>
   cancel(requestId: string): Promise<boolean>
   stopTab(tabId: string): Promise<boolean>
@@ -61,6 +63,7 @@ const api: CluiAPI = {
   // ─── Request-response ───
   start: () => ipcRenderer.invoke(IPC.START),
   createTab: () => ipcRenderer.invoke(IPC.CREATE_TAB),
+  listProviders: () => ipcRenderer.invoke(IPC.LIST_PROVIDERS),
   prompt: (tabId, requestId, options) => ipcRenderer.invoke(IPC.PROMPT, { tabId, requestId, options }),
   cancel: (requestId) => ipcRenderer.invoke(IPC.CANCEL, requestId),
   stopTab: (tabId) => ipcRenderer.invoke(IPC.STOP_TAB, tabId),

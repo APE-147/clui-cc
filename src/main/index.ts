@@ -7,6 +7,7 @@ import { execFileSync } from 'child_process'
 import { ControlPlane } from './claude/control-plane'
 import { ensureSkills, type SkillStatus } from './skills/installer'
 import { fetchCatalog, listInstalled, installPlugin, uninstallPlugin } from './marketplace/catalog'
+import { providerRegistry } from './providers/registry'
 import { log as _log, LOG_FILE, flushLogs } from './logger'
 import { getCliEnv } from './cli-env'
 import { IPC } from '../shared/types'
@@ -447,6 +448,10 @@ ipcMain.handle(IPC.CREATE_TAB, () => {
   const tabId = controlPlane.createTab()
   log(`IPC CREATE_TAB → ${tabId}`)
   return { tabId }
+})
+
+ipcMain.handle(IPC.LIST_PROVIDERS, () => {
+  return providerRegistry.listInfo()
 })
 
 ipcMain.on(IPC.INIT_SESSION, (_event, tabId: string) => {

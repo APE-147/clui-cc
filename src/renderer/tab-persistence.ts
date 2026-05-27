@@ -1,5 +1,6 @@
 import type { Message, TabState } from '../shared/types'
-import { isKnownModelId } from './models'
+import type { ProviderId } from '../shared/provider-types'
+import { isKnownModelId, isKnownModelIdForProvider } from './models'
 
 const TABS_STORAGE_KEY = 'clui-open-tabs'
 const MAX_PERSISTED_TABS = 20
@@ -13,6 +14,8 @@ export interface PersistedTabSnapshot {
   hasChosenDirectory: boolean
   additionalDirs: string[]
   modelOverride: string | null
+  provider: ProviderId
+  providerEndpoint: string | null
 }
 
 export interface PersistedTabsState {
@@ -30,7 +33,25 @@ export function tabToSnapshot(tab: TabState): PersistedTabSnapshot {
     workingDirectory: tab.workingDirectory || '~',
     hasChosenDirectory: tab.hasChosenDirectory,
     additionalDirs: [...tab.additionalDirs],
-    modelOverride: tab.modelOverride && isKnownModelId(tab.modelOverride) ? tab.modelOverride : null,
+    modelOverride: tab.modelOverride && isKnownModelIdForProvider(tab.modelOverride, tab.provider) ? tab.modelOverride : null,
+    provider: tab.provider,
+    providerEndpoint: normalizeEndpoint(tab.providerEndpoint),
+  }
+}
+
+function isProviderId(value: unknown): value is ProviderId {
+  return value === 'claude' || value === 'codex' || value === 'openai-direct'
+}
+
+function normalizeEndpoint(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  try {
+    const url = new URL(trimmed)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? trimmed : null
+  } catch {
+    return null
   }
 }
 
@@ -52,22 +73,29 @@ export function loadOpenTabs(): PersistedTabsState | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as PersistedTabsState
     if (!parsed || !Array.isArray(parsed.tabs) || parsed.tabs.length === 0) return null
-    const tabs = parsed.tabs.slice(0, MAX_PERSISTED_TABS).map((t) => ({
-      title: typeof t.title === 'string' && t.title.trim() ? t.title : 'New Tab',
-      claudeSessionId:
-        typeof t.claudeSessionId === 'string' && SESSION_UUID_RE.test(t.claudeSessionId)
-          ? t.claudeSessionId
-          : null,
-      workingDirectory: typeof t.workingDirectory === 'string' ? t.workingDirectory : '~',
-      hasChosenDirectory: !!t.hasChosenDirectory,
-      additionalDirs: Array.isArray(t.additionalDirs)
-        ? t.additionalDirs.filter((d): d is string => typeof d === 'string')
-        : [],
-      modelOverride:
-        typeof t.modelOverride === 'string' && isKnownModelId(t.modelOverride)
+    const tabs = parsed.tabs.slice(0, MAX_PERSISTED_TABS).map((t) => {
+      const provider = isProviderId(t.provider) ? t.provider : 'claude'
+      const modelOverride =
+        typeof t.modelOverride === 'string' && isKnownModelId(t.modelOverride) && isKnownModelIdForProvider(t.modelOverride, provider)
           ? t.modelOverride
-          : null,
-    }))
+          : null
+
+      return {
+        title: typeof t.title === 'string' && t.title.trim() ? t.title : 'New Tab',
+        claudeSessionId:
+          provider === 'claude' && typeof t.claudeSessionId === 'string' && SESSION_UUID_RE.test(t.claudeSessionId)
+            ? t.claudeSessionId
+            : null,
+        workingDirectory: typeof t.workingDirectory === 'string' ? t.workingDirectory : '~',
+        hasChosenDirectory: !!t.hasChosenDirectory,
+        additionalDirs: Array.isArray(t.additionalDirs)
+          ? t.additionalDirs.filter((d): d is string => typeof d === 'string')
+          : [],
+        modelOverride,
+        provider,
+        providerEndpoint: provider === 'codex' ? normalizeEndpoint(t.providerEndpoint) : null,
+      }
+    })
     const activeTabIndex =
       typeof parsed.activeTabIndex === 'number' && parsed.activeTabIndex >= 0
         ? Math.min(parsed.activeTabIndex, tabs.length - 1)

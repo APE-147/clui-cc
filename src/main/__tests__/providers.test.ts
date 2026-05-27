@@ -87,6 +87,31 @@ describe('CodexProvider', () => {
     })
     expect(provider.normalizeEvent({ type: 'done' })).toBeNull()
   })
+
+  it('normalizes current Codex CLI item and turn events', () => {
+    const provider = new CodexProvider()
+
+    expect(provider.normalizeEvent({
+      type: 'item.completed',
+      item: { id: 'item_0', type: 'agent_message', text: 'OK' },
+    })).toEqual({
+      type: 'text_chunk',
+      text: 'OK',
+    })
+    expect(provider.normalizeEvent({
+      type: 'turn.completed',
+      usage: { input_tokens: 1, output_tokens: 2 },
+      thread_id: 'thread-1',
+    })).toEqual({
+      type: 'task_complete',
+      result: '',
+      costUsd: 0,
+      durationMs: 0,
+      numTurns: 1,
+      usage: { input_tokens: 1, output_tokens: 2 },
+      sessionId: 'thread-1',
+    })
+  })
 })
 
 describe('ProviderRegistry', () => {

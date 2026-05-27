@@ -1,6 +1,6 @@
 # Clui CC — Command Line User Interface for Claude Code
 
-A lightweight, transparent desktop overlay for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) on macOS. Clui CC wraps the Claude Code CLI in a floating pill interface with multi-tab sessions, a permission approval UI, voice input, and a skills marketplace.
+A lightweight, transparent desktop overlay for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) on macOS. Clui CC wraps local agent CLIs in a floating pill interface with multi-tab sessions, a permission approval UI, voice input, and a skills marketplace.
 
 ## Demo
 
@@ -11,7 +11,8 @@ A lightweight, transparent desktop overlay for [Claude Code](https://docs.anthro
 ## Features
 
 - **Floating overlay** — transparent, click-through window that stays on top. Toggle with `⌥ + Space` (fallback: `Cmd+Shift+K`).
-- **Multi-tab sessions** — each tab spawns its own `claude -p` process with independent session state.
+- **Multi-tab sessions** — each tab spawns its own provider process with independent session state.
+- **Provider selection** — use Claude Code, Codex CLI, or a Codex-backed OpenAI-compatible endpoint per tab.
 - **Permission approval UI** — intercepts tool calls via PreToolUse HTTP hooks so you can review and approve/deny from the UI.
 - **Conversation history** — browse and resume past Claude Code sessions.
 - **Skills marketplace** — install plugins from Anthropic's GitHub repos without leaving Clui CC.
@@ -21,16 +22,16 @@ A lightweight, transparent desktop overlay for [Claude Code](https://docs.anthro
 
 ## Why Clui CC
 
-- **Claude Code, but visual** — keep CLI power while getting a fast desktop UX for approvals, history, and multitasking.
+- **Agent CLIs, but visual** — keep CLI power while getting a fast desktop UX for approvals, history, and multitasking.
 - **Human-in-the-loop safety** — tool calls are reviewed and approved in-app before execution.
 - **Session-native workflow** — each tab runs an independent Claude session you can resume later.
-- **Local-first** — everything runs through your local Claude CLI. No telemetry, no cloud dependency.
+- **Local-first** — everything runs through your local provider CLI. No telemetry, no cloud dependency.
 
 ## How It Works
 
 ```
-UI prompt → Main process spawns claude -p → NDJSON stream → live render
-                                         → tool call? → permission UI → approve/deny
+UI prompt → ProviderRegistry → claude -p / codex exec --json → NDJSON stream → live render
+                                                     → tool call? → permission UI → approve/deny
 ```
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full deep-dive.
@@ -153,7 +154,15 @@ npm install -g @anthropic-ai/claude-code
 claude
 ```
 
-**Step 6.** Install Whisper for voice input:
+**Step 6.** Optional: install Codex CLI for GPT/o-series and OpenAI-compatible endpoints:
+
+```bash
+npm install -g @openai/codex
+```
+
+Authenticate Codex using its normal CLI flow before selecting it in Clui CC.
+
+**Step 7.** Install Whisper for voice input:
 
 ```bash
 # Apple Silicon (M1/M2/M3/M4) — preferred:
@@ -162,7 +171,7 @@ brew install whisperkit-cli
 brew install whisper-cpp
 ```
 
-> **No API keys or `.env` file required.** Clui CC uses your existing Claude Code CLI authentication (Pro/Team/Enterprise subscription).
+> **No Clui-specific API keys or `.env` file required.** Clui CC uses your existing provider CLI authentication.
 
 </details>
 
@@ -175,6 +184,7 @@ brew install whisper-cpp
 src/
 ├── main/                   # Electron main process
 │   ├── claude/             # ControlPlane, RunManager, EventNormalizer
+│   ├── providers/          # ClaudeProvider, CodexProvider, ProviderRegistry
 │   ├── hooks/              # PermissionServer (PreToolUse HTTP hooks)
 │   ├── marketplace/        # Plugin catalog fetching + install
 │   ├── skills/             # Skill auto-installer
@@ -190,12 +200,22 @@ src/
 
 ### How It Works
 
-1. Each tab creates a `claude -p --output-format stream-json` subprocess.
-2. NDJSON events are parsed by `RunManager` and normalized by `EventNormalizer`.
-3. `ControlPlane` manages tab lifecycle (connecting → idle → running → completed/failed/dead).
-4. Tool permission requests arrive via HTTP hooks to `PermissionServer` (localhost only).
-5. The renderer polls backend health every 1.5s and reconciles tab state.
-6. Sessions are resumed with `--resume <session-id>` for continuity.
+1. Each tab stores a provider id (`claude` or `codex`) and optional Codex base URL.
+2. `ProviderRegistry` resolves the run to `ClaudeProvider` or `CodexProvider`.
+3. Providers own binary discovery, CLI args, and raw JSONL-to-CLUI event normalization.
+4. NDJSON events are parsed by `RunManager` into canonical `NormalizedEvent` values.
+5. `ControlPlane` manages tab lifecycle (connecting → idle → running → completed/failed/dead).
+6. Claude tool permission requests arrive via HTTP hooks to `PermissionServer` (localhost only).
+7. The renderer polls backend health every 1.5s and reconciles tab state.
+8. Claude sessions are resumed with `--resume <session-id>` for continuity; Codex runs are stateless.
+
+### Adding a Provider
+
+1. Implement `ProviderDefinition` from `src/shared/provider-types.ts`.
+2. Add a provider class under `src/main/providers/`.
+3. Register it in `src/main/providers/registry.ts`.
+4. Add model metadata in `src/renderer/models.ts` and expose settings UI if needed.
+5. Cover args, routing, and event normalization in `src/main/__tests__/providers.test.ts`.
 
 ### Network Behavior
 
@@ -206,7 +226,7 @@ Clui CC operates almost entirely offline. The only outbound network calls are:
 | `raw.githubusercontent.com/anthropics/*` | Marketplace catalog (cached 5 min) | No — graceful fallback |
 | `api.github.com/repos/anthropics/*/tarball/*` | Skill auto-install on startup | No — skipped on failure |
 
-No telemetry, analytics, or auto-update mechanisms. All core Claude Code interaction goes through the local CLI.
+No telemetry, analytics, or auto-update mechanisms. All core agent interaction goes through local CLIs.
 
 </details>
 
@@ -229,12 +249,13 @@ npm run doctor
 | Python | 3.12 (with setuptools installed) |
 | Electron | 33.x |
 | Claude Code CLI | 2.1.71 |
+| Codex CLI | Optional, tested with `codex exec --json` |
 
 ## Known Limitations
 
 - **macOS only** — transparent overlay, tray icon, and node-pty are macOS-specific. Windows/Linux support is not currently implemented.
-- **Requires Claude Code CLI** — Clui CC is a UI layer, not a standalone AI client. You need an authenticated `claude` CLI.
-- **Permission mode** — uses `--permission-mode default`. The PTY interactive transport is legacy and disabled by default.
+- **Requires a local provider CLI** — Claude requires authenticated `claude`; Codex requires authenticated `codex`.
+- **Permission mode** — Claude uses `--permission-mode default`. Codex provider runs do not use CLUI's Claude permission hook flow.
 
 ## License
 

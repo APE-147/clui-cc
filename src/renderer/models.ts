@@ -1,13 +1,32 @@
+import type { ProviderId } from '../shared/provider-types'
+
+export type ModelOption = { id: string; label: string }
+
 /** Known Claude models available in the UI picker */
-export const AVAILABLE_MODELS = [
+export const CLAUDE_MODELS = [
   { id: 'claude-opus-4-6', label: 'Opus 4.6' },
   { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
   { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
 ] as const
 
-export const DEFAULT_MODEL_ID = AVAILABLE_MODELS[0].id
+export const CODEX_MODELS = [
+  { id: 'gpt-5.5', label: 'GPT 5.5' },
+  { id: 'gpt-5', label: 'GPT 5' },
+  { id: 'o3-pro', label: 'o3 Pro' },
+  { id: 'o4-mini', label: 'o4 Mini' },
+] as const
 
-export type ModelId = (typeof AVAILABLE_MODELS)[number]['id']
+export const PROVIDER_MODELS: Record<ProviderId, readonly ModelOption[]> = {
+  claude: CLAUDE_MODELS,
+  codex: CODEX_MODELS,
+  'openai-direct': CODEX_MODELS,
+}
+
+export const AVAILABLE_MODELS = CLAUDE_MODELS
+export const DEFAULT_MODEL_ID = CLAUDE_MODELS[0].id
+export const DEFAULT_PROVIDER_ID: ProviderId = 'claude'
+
+export type ModelId = (typeof CLAUDE_MODELS)[number]['id'] | (typeof CODEX_MODELS)[number]['id']
 
 function normalizeModelId(modelId: string): string {
   return modelId.replace(/\[[^\]]+\]/g, '').trim()
@@ -15,19 +34,34 @@ function normalizeModelId(modelId: string): string {
 
 export function isKnownModelId(modelId: string): boolean {
   const normalized = normalizeModelId(modelId)
-  return AVAILABLE_MODELS.some((m) => m.id === normalized)
+  return Object.values(PROVIDER_MODELS).some((models) => models.some((m) => m.id === normalized))
 }
 
-export function resolveModelId(modelId: string | null | undefined): string {
-  if (modelId && isKnownModelId(modelId)) return normalizeModelId(modelId)
-  return DEFAULT_MODEL_ID
+export function isKnownModelIdForProvider(modelId: string, provider: ProviderId): boolean {
+  const normalized = normalizeModelId(modelId)
+  return PROVIDER_MODELS[provider].some((m) => m.id === normalized)
+}
+
+export function getModelsForProvider(provider: ProviderId): readonly ModelOption[] {
+  return PROVIDER_MODELS[provider] || CLAUDE_MODELS
+}
+
+export function getDefaultModelForProvider(provider: ProviderId): string {
+  return getModelsForProvider(provider)[0]?.id || DEFAULT_MODEL_ID
+}
+
+export function resolveModelId(modelId: string | null | undefined, provider: ProviderId = DEFAULT_PROVIDER_ID): string {
+  if (modelId && isKnownModelIdForProvider(modelId, provider)) return normalizeModelId(modelId)
+  return getDefaultModelForProvider(provider)
 }
 
 export function getModelDisplayLabel(modelId: string): string {
   const normalizedId = normalizeModelId(modelId)
   const has1MContext = /\[\s*1m\s*\]/i.test(modelId)
 
-  const known = AVAILABLE_MODELS.find((m) => m.id === normalizedId)
+  const known = Object.values(PROVIDER_MODELS)
+    .flat()
+    .find((m) => m.id === normalizedId)
   if (known) {
     return has1MContext ? `${known.label} (1M)` : known.label
   }
@@ -46,8 +80,9 @@ export function getModelDisplayLabel(modelId: string): string {
 }
 
 export function getEffectiveModel(
-  tab: { modelOverride: string | null },
+  tab: { modelOverride: string | null; provider?: ProviderId },
   defaultModel: string,
 ): string {
-  return tab.modelOverride ?? resolveModelId(defaultModel)
+  const provider = tab.provider || DEFAULT_PROVIDER_ID
+  return resolveModelId(tab.modelOverride ?? defaultModel, provider)
 }

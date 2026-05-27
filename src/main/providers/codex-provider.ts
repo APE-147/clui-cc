@@ -47,6 +47,7 @@ export class CodexProvider implements ProviderDefinition {
   findBinary(): string | null {
     return findExecutable('codex', [
       join(homedir(), '.local/bin/codex'),
+      join(homedir(), 'Developer/bin/codex'),
       '/usr/local/bin/codex',
       '/opt/homebrew/bin/codex',
       join(homedir(), '.npm-global/bin/codex'),
@@ -70,6 +71,34 @@ export class CodexProvider implements ProviderDefinition {
     const event = raw as Record<string, any>
 
     switch (event.type) {
+      case 'item.completed': {
+        const item = event.item || {}
+        if (item.type === 'agent_message') {
+          return { type: 'text_chunk', text: contentToText(item.text ?? item.content) }
+        }
+        if (item.type === 'tool_call' || item.type === 'function_call') {
+          return {
+            type: 'tool_call',
+            toolName: String(item.name || item.tool_name || 'unknown'),
+            toolId: String(item.id || item.call_id || ''),
+            index: 0,
+          }
+        }
+        if (item.type === 'tool_result' || item.type === 'function_call_output') {
+          return { type: 'tool_call_complete', index: 0 }
+        }
+        return null
+      }
+      case 'turn.completed':
+        return {
+          type: 'task_complete',
+          result: typeof event.result === 'string' ? event.result : '',
+          costUsd: typeof event.cost_usd === 'number' ? event.cost_usd : 0,
+          durationMs: typeof event.duration_ms === 'number' ? event.duration_ms : 0,
+          numTurns: typeof event.num_turns === 'number' ? event.num_turns : 1,
+          usage: (event.usage || {}) as UsageData,
+          sessionId: typeof event.thread_id === 'string' ? event.thread_id : '',
+        }
       case 'message':
         if (event.role !== 'assistant') return null
         return { type: 'text_chunk', text: contentToText(event.content) }

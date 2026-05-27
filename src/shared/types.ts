@@ -335,6 +335,7 @@ export const IPC = {
   LOAD_SESSION: 'clui:load-session',
   GET_SESSION_MODEL: 'clui:get-session-model',
   SET_SESSION_MODEL: 'clui:set-session-model',
+  LIST_PROVIDERS: 'clui:list-providers',
 
   // One-way events (main → renderer)
   TEXT_CHUNK: 'clui:text-chunk',

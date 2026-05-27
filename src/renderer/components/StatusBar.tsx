@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Terminal, CaretDown, Check, FolderOpen, Plus, X, ShieldCheck } from '@phosphor-icons/react'
-import { useSessionStore, AVAILABLE_MODELS, getModelDisplayLabel, getEffectiveModel } from '../stores/sessionStore'
+import { useSessionStore, getModelDisplayLabel, getEffectiveModel, getModelsForProvider } from '../stores/sessionStore'
 import { usePopoverLayer } from './PopoverLayer'
 import { useColors, useThemeStore } from '../theme'
 
@@ -10,10 +10,11 @@ import { useColors, useThemeStore } from '../theme'
 
 function ModelPicker() {
   const defaultModel = useThemeStore((s) => s.defaultModel)
+  const defaultProvider = useThemeStore((s) => s.defaultProvider)
   const setTabModel = useSessionStore((s) => s.setTabModel)
   const tab = useSessionStore(
     (s) => s.tabs.find((t) => t.id === s.activeTabId),
-    (a, b) => a === b || (!!a && !!b && a.status === b.status && a.sessionModel === b.sessionModel && a.modelOverride === b.modelOverride),
+    (a, b) => a === b || (!!a && !!b && a.status === b.status && a.sessionModel === b.sessionModel && a.modelOverride === b.modelOverride && a.provider === b.provider),
   )
   const popoverLayer = usePopoverLayer()
   const colors = useColors()
@@ -53,8 +54,10 @@ function ModelPicker() {
   }
 
   const effectiveModel = tab ? getEffectiveModel(tab, defaultModel) : defaultModel
+  const activeProvider = tab?.provider ?? defaultProvider
+  const models = getModelsForProvider(activeProvider)
   const activeLabel = (() => {
-    const m = AVAILABLE_MODELS.find((item) => item.id === effectiveModel)
+    const m = models.find((item) => item.id === effectiveModel)
     return m?.label || getModelDisplayLabel(effectiveModel)
   })()
 
@@ -97,7 +100,7 @@ function ModelPicker() {
           }}
         >
           <div className="py-1">
-            {AVAILABLE_MODELS.map((m) => {
+            {models.map((m) => {
               const isSelected = effectiveModel === m.id
               return (
                 <button

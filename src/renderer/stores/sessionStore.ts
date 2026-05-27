@@ -5,12 +5,15 @@ import {
   AVAILABLE_MODELS,
   getEffectiveModel,
   getModelDisplayLabel,
+  getModelsForProvider,
   isKnownModelId,
+  isKnownModelIdForProvider,
 } from '../models'
 import notificationSrc from '../../../resources/notification.mp3'
 import { loadOpenTabs, loadTabHistory, saveOpenTabs, type PersistedTabSnapshot } from '../tab-persistence'
+import type { ProviderId } from '../../shared/provider-types'
 
-export { AVAILABLE_MODELS, getModelDisplayLabel, getEffectiveModel }
+export { AVAILABLE_MODELS, getModelDisplayLabel, getEffectiveModel, getModelsForProvider }
 
 function resolveProjectPath(tab: TabState, homePath?: string): string {
   if (tab.workingDirectory && tab.workingDirectory !== '~') return tab.workingDirectory
@@ -67,6 +70,8 @@ interface State {
   /** Load static info, restore open tabs from last session, or create one default tab */
   initAndRestoreTabs: () => Promise<void>
   setTabModel: (modelId: string) => void
+  setTabProvider: (provider: ProviderId, providerEndpoint?: string | null) => void
+  setTabProviderEndpoint: (endpoint: string | null) => void
   setPermissionMode: (mode: 'ask' | 'auto') => void
   createTab: () => Promise<string>
   selectTab: (tabId: string) => void
@@ -140,6 +145,8 @@ async function buildTabFromSnapshot(
     ...makeLocalTab(),
     id: tabId,
     title: snapshot?.title ?? 'New Tab',
+    provider: snapshot?.provider ?? useThemeStore.getState().defaultProvider,
+    providerEndpoint: snapshot?.providerEndpoint ?? null,
     claudeSessionId: snapshot?.claudeSessionId ?? null,
     workingDirectory: snapshot?.workingDirectory ?? homeDir,
     hasChosenDirectory: snapshot?.hasChosenDirectory ?? false,
@@ -150,10 +157,11 @@ async function buildTabFromSnapshot(
 }
 
 function makeLocalTab(): TabState {
+  const theme = useThemeStore.getState()
   return {
     id: crypto.randomUUID(),
-    provider: 'claude',
-    providerEndpoint: null,
+    provider: theme.defaultProvider,
+    providerEndpoint: theme.defaultProvider === 'codex' ? (theme.providerEndpoint || null) : null,
     claudeSessionId: null,
     status: 'idle',
     activeRequestId: null,
@@ -250,8 +258,9 @@ export const useSessionStore = create<State>((set, get) => ({
   },
 
   setTabModel: (modelId) => {
-    if (!isKnownModelId(modelId)) return
     const { activeTabId, staticInfo } = get()
+    const currentTab = get().tabs.find((t) => t.id === activeTabId)
+    if (!currentTab || !isKnownModelIdForProvider(modelId, currentTab.provider)) return
     let updatedTab: TabState | null = null
     set((s) => ({
       tabs: s.tabs.map((t) => {
@@ -261,6 +270,42 @@ export const useSessionStore = create<State>((set, get) => ({
       }),
     }))
     if (updatedTab) void persistSessionModel(updatedTab, staticInfo?.homePath)
+  },
+
+  setTabProvider: (provider, providerEndpoint = null) => {
+    const { activeTabId } = get()
+    const endpoint = provider === 'codex' ? (providerEndpoint?.trim() || null) : null
+    window.clui.resetTabSession(activeTabId)
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === activeTabId
+          ? {
+              ...t,
+              provider,
+              providerEndpoint: endpoint,
+              claudeSessionId: null,
+              sessionModel: null,
+              modelOverride: null,
+              sessionTools: [],
+              sessionMcpServers: [],
+              sessionSkills: [],
+              sessionVersion: null,
+            }
+          : t,
+      ),
+    }))
+  },
+
+  setTabProviderEndpoint: (endpoint) => {
+    const { activeTabId } = get()
+    const normalized = endpoint?.trim() || null
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === activeTabId
+          ? { ...t, providerEndpoint: t.provider === 'codex' ? normalized : null }
+          : t,
+      ),
+    }))
   },
 
   setPermissionMode: (mode) => {
@@ -488,6 +533,8 @@ export const useSessionStore = create<State>((set, get) => ({
       const tab: TabState = {
         ...makeLocalTab(),
         id: tabId,
+        provider: 'claude',
+        providerEndpoint: null,
         claudeSessionId: sessionId,
         title: title || 'Resumed Session',
         workingDirectory: defaultDir,
@@ -506,6 +553,8 @@ export const useSessionStore = create<State>((set, get) => ({
       const savedModel = await loadSessionModelOverride(sessionId, defaultDir).catch(() => null)
       const tab = makeLocalTab()
       tab.claudeSessionId = sessionId
+      tab.provider = 'claude'
+      tab.providerEndpoint = null
       tab.title = title || 'Resumed Session'
       tab.workingDirectory = defaultDir
       tab.hasChosenDirectory = !!projectPath

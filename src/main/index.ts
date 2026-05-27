@@ -282,11 +282,12 @@ function resetWindowPosition(): void {
   const { x: dx, y: dy } = display.workArea
 
   mainWindow.setBounds({
-    x: dx + Math.round((sw - BAR_WIDTH) / 2),
-    y: dy + sh - PILL_HEIGHT - PILL_BOTTOM_MARGIN,
-    width: BAR_WIDTH,
-    height: PILL_HEIGHT,
+    x: dx,
+    y: dy,
+    width: Math.max(sw, MIN_WIDTH),
+    height: Math.max(sh, MIN_HEIGHT),
   })
+  syncDockMargin()
   lastWindowBounds = mainWindow.getBounds()
 }
 
@@ -308,7 +309,7 @@ function toggleWindow(source = 'unknown'): void {
 
 // ─── Resize ───
 // Fixed-height mode: ignore renderer resize events to prevent jank.
-// The native window stays at PILL_HEIGHT; all expand/collapse happens inside the renderer.
+// The native window fills the workArea; all expand/collapse happens inside the renderer.
 
 ipcMain.on(IPC.RESIZE_HEIGHT, () => {
   // No-op — fixed height window, no dynamic resize

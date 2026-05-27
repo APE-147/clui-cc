@@ -60,6 +60,44 @@ let tray: Tray | null = null
 let screenshotCounter = 0
 let toggleSequence = 0
 let lastWindowBounds: Electron.Rectangle | null = null
+let currentZoomFactor = 1.0
+
+// ─── Zoom persistence ───
+
+function zoomFilePath(): string {
+  return join(app.getPath('userData'), 'clui-zoom.json')
+}
+
+function loadSavedZoom(): number {
+  try {
+    const { readFileSync } = require('fs')
+    const raw = readFileSync(zoomFilePath(), 'utf-8')
+    const parsed = JSON.parse(raw)
+    const factor = parsed.factor
+    if (typeof factor === 'number' && factor >= 0.7 && factor <= 1.5) return factor
+  } catch {}
+  return 1.0
+}
+
+function persistZoom(factor: number): void {
+  try {
+    const { writeFileSync, mkdirSync } = require('fs')
+    mkdirSync(app.getPath('userData'), { recursive: true })
+    writeFileSync(zoomFilePath(), JSON.stringify({ factor }))
+  } catch {}
+}
+
+function applyZoom(factor: number): void {
+  currentZoomFactor = Math.round(factor * 10) / 10
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    persistZoom(currentZoomFactor)
+    return
+  }
+
+  mainWindow.webContents.setZoomFactor(currentZoomFactor)
+  lastWindowBounds = mainWindow.getBounds()
+  persistZoom(currentZoomFactor)
+}
 
 // Feature flag: enable PTY interactive permissions transport
 const INTERACTIVE_PTY = process.env.CLUI_INTERACTIVE_PERMISSIONS_PTY === '1'
@@ -223,8 +261,29 @@ function createWindow(): void {
     // { forward: true } ensures mousemove events still reach the renderer
     // so it can toggle click-through off when cursor enters interactive UI.
     mainWindow?.setIgnoreMouseEvents(true, { forward: true })
+    // Restore saved zoom factor
+    if (currentZoomFactor !== 1.0 && mainWindow) {
+      mainWindow.webContents.setZoomFactor(currentZoomFactor)
+    }
     if (process.env.ELECTRON_RENDERER_URL) {
       mainWindow?.webContents.openDevTools({ mode: 'detach' })
+    }
+  })
+
+  // Intercept Cmd++/Cmd+-/Cmd+0 to manage zoom + window resize together
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return
+    const isMod = input.meta || input.control
+    if (!isMod || input.alt) return
+    if (input.key === '=' || input.key === '+') {
+      event.preventDefault()
+      applyZoom(Math.min(1.5, currentZoomFactor + 0.1))
+    } else if (input.key === '-') {
+      event.preventDefault()
+      applyZoom(Math.max(0.7, currentZoomFactor - 0.1))
+    } else if (input.key === '0') {
+      event.preventDefault()
+      applyZoom(1.0)
     }
   })
 
@@ -1147,6 +1206,9 @@ app.whenReady().then(async () => {
   await requestPermissions()
 
   installContentSecurityPolicy()
+
+  // Restore saved zoom before window creation so initial dimensions are correct
+  currentZoomFactor = loadSavedZoom()
 
   // Skill provisioning — non-blocking, streams status to renderer
   ensureSkills((status: SkillStatus) => {

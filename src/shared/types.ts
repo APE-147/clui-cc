@@ -1,3 +1,5 @@
+import type { ProviderId } from './provider-types'
+
 // ─── Claude Code Stream Event Types (verified from v2.1.63) ───
 
 export interface InitEvent {
@@ -143,6 +145,8 @@ export interface Attachment {
 
 export interface TabState {
   id: string
+  provider: ProviderId
+  providerEndpoint: string | null
   claudeSessionId: string | null
   status: TabStatus
   activeRequestId: string | null
@@ -213,6 +217,9 @@ export type NormalizedEvent =
 export interface RunOptions {
   prompt: string
   projectPath: string
+  provider?: ProviderId
+  providerEndpoint?: string
+  providerApiKeyEnvVar?: string
   sessionId?: string
   allowedTools?: string[]
   maxTurns?: number

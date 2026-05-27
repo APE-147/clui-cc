@@ -152,6 +152,8 @@ async function buildTabFromSnapshot(
 function makeLocalTab(): TabState {
   return {
     id: crypto.randomUUID(),
+    provider: 'claude',
+    providerEndpoint: null,
     claudeSessionId: null,
     status: 'idle',
     activeRequestId: null,
@@ -708,6 +710,8 @@ export const useSessionStore = create<State>((set, get) => ({
     window.clui.prompt(activeTabId, requestId, {
       prompt: fullPrompt,
       projectPath: resolvedPath,
+      provider: tab.provider,
+      providerEndpoint: tab.providerEndpoint || undefined,
       sessionId: tab.claudeSessionId || undefined,
       model,
       addDirs: tab.additionalDirs.length > 0 ? tab.additionalDirs : undefined,

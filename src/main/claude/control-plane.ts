@@ -4,6 +4,7 @@ import { PtyRunManager } from './pty-run-manager'
 import { PermissionServer, maskSensitiveFields } from '../hooks/permission-server'
 import type { HookToolRequest, PermissionOption } from '../hooks/permission-server'
 import { log as _log } from '../logger'
+import { providerRegistry } from '../providers/registry'
 import type {
   TabStatus,
   TabRegistryEntry,
@@ -592,13 +593,15 @@ export class ControlPlane extends EventEmitter {
     // This prevents early prompts from silently falling back to --allowedTools.
     await this.hookServerReady
 
-    // Use stored session ID for resume if available and not overridden
-    if (tab.claudeSessionId && !options.sessionId) {
+    const provider = providerRegistry.resolve(options)
+
+    // Use stored session ID only for providers that support native resume.
+    if (provider.supportsResume && tab.claudeSessionId && !options.sessionId) {
       options = { ...options, sessionId: tab.claudeSessionId }
     }
 
-    // Per-run token lifecycle: register run, generate per-run settings file
-    if (this.permissionServer.getPort()) {
+    // Per-run token lifecycle: Claude hook permissions are provider-specific.
+    if (provider.supportsPermissions && this.permissionServer.getPort()) {
       const runToken = this.permissionServer.registerRun(tabId, requestId, options.sessionId || null)
       this.runTokens.set(requestId, runToken)
       const hookSettingsPath = this.permissionServer.generateSettingsFile(runToken)
@@ -609,8 +612,11 @@ export class ControlPlane extends EventEmitter {
     if (!this.initRequestIds.has(requestId)) tab.promptCount++
     tab.lastActivityAt = Date.now()
 
-    // Set status to connecting (first run) or running (subsequent)
-    const newStatus: TabStatus = tab.claudeSessionId ? 'running' : 'connecting'
+    // Claude transitions from connecting once session_init arrives. Providers
+    // without resumable sessions may not emit session_init, so mark them running.
+    const newStatus: TabStatus = provider.supportsResume
+      ? (tab.claudeSessionId ? 'running' : 'connecting')
+      : 'running'
     this._setTabStatus(tabId, newStatus)
 
     // ─── Pick transport ───

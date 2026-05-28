@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { DotsThree, Bell, ArrowsOutSimple, ArrowsHorizontal, Moon, Robot, Terminal, CaretDown, Check, Key, ArrowsClockwise } from '@phosphor-icons/react'
 import { CLI_TERMINAL_OPTIONS, CODEX_REASONING_EFFORT_OPTIONS, useColors, useThemeStore } from '../theme'
 import { getEffectiveModel, getModelDisplayLabel, getModelsForProvider, useSessionStore } from '../stores/sessionStore'
-import { getDefaultModelForProvider, resolveModelId } from '../models'
+import { getDefaultModelForProvider, resolveCustomProviderModelAfterDiscovery, resolveModelId, resolveProviderModelForRun } from '../models'
 import { UI_SCALE_OPTIONS } from '../layout'
 import type { ProviderId, ProviderInfo } from '../../shared/provider-types'
 
@@ -211,9 +211,12 @@ export function SettingsContent() {
   const visibleModels = isCustomProvider && customProviderModels.length > 0
     ? customProviderModels
     : getModelsForProvider(activeProvider)
-  const selectedModel = activeTab
+  const baseSelectedModel = activeTab
     ? getEffectiveModel(activeTab, defaultModel)
     : resolveModelId(defaultModel, defaultProvider)
+  const selectedModel = isCustomProvider
+    ? resolveProviderModelForRun(baseSelectedModel, 'openai-direct', customProviderModels)
+    : baseSelectedModel
   const endpointIsValid = isValidEndpoint(endpointDraft)
   const customModelIsValid = customModelDraft.trim().length > 0
   const canRefreshCustomModels = isCustomProvider
@@ -262,7 +265,11 @@ export function SettingsContent() {
     const endpoint = mode === 'custom' ? endpointDraft.trim() : ''
     if (mode === 'custom' && !isValidEndpoint(endpoint)) return
     const provider: ProviderId = mode === 'claude' ? 'claude' : mode === 'custom' ? 'openai-direct' : 'codex'
-    const model = provider === activeProvider ? selectedModel : getDefaultModelForProvider(provider)
+    const model = provider === activeProvider
+      ? selectedModel
+      : provider === 'openai-direct'
+        ? resolveCustomProviderModelAfterDiscovery(selectedModel, customProviderModels) || getDefaultModelForProvider(provider)
+        : getDefaultModelForProvider(provider)
     setDefaultProvider(provider)
     setDefaultModel(model)
     setProviderEndpoint(endpoint)
@@ -300,6 +307,12 @@ export function SettingsContent() {
       return
     }
     setCustomProviderModels(result.models)
+    const nextModel = resolveCustomProviderModelAfterDiscovery(selectedModel, result.models)
+    if (nextModel && nextModel !== selectedModel) {
+      setDefaultModel(nextModel)
+      setCustomModelDraft(nextModel)
+      if (activeTab) setTabModel(nextModel)
+    }
     setModelDiscoveryStatus('idle')
   }
 

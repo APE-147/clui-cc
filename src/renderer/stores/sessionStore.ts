@@ -8,6 +8,7 @@ import {
   getModelsForProvider,
   isKnownModelId,
   isKnownModelIdForProvider,
+  resolveProviderModelForRun,
 } from '../models'
 import notificationSrc from '../../../resources/notification.mp3'
 import { loadOpenTabs, loadTabHistory, saveOpenTabs, type PersistedTabSnapshot } from '../tab-persistence'
@@ -755,7 +756,11 @@ export const useSessionStore = create<State>((set, get) => ({
 
     // Send to backend — ControlPlane will queue if a run is active
     const theme = useThemeStore.getState()
-    const model = getEffectiveModel(tab, theme.defaultModel)
+    const model = resolveProviderModelForRun(
+      getEffectiveModel(tab, theme.defaultModel),
+      tab.provider,
+      theme.customProviderModels,
+    )
     window.clui.prompt(activeTabId, requestId, {
       prompt: fullPrompt,
       projectPath: resolvedPath,

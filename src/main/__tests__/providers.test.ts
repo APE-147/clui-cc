@@ -151,6 +151,23 @@ describe('CodexProvider', () => {
       sessionId: 'thread-1',
     })
   })
+
+  it('surfaces final Codex turn failures but ignores retry notices', () => {
+    const provider = new CodexProvider()
+
+    expect(provider.normalizeEvent({
+      type: 'error',
+      message: 'Reconnecting... 1/5 (unexpected status 502 Bad Gateway)',
+    })).toBeNull()
+    expect(provider.normalizeEvent({
+      type: 'turn.failed',
+      error: { message: 'unexpected status 502 Bad Gateway: unknown provider for model gpt-4o' },
+    })).toEqual({
+      type: 'error',
+      message: 'unexpected status 502 Bad Gateway: unknown provider for model gpt-4o',
+      isError: true,
+    })
+  })
 })
 
 describe('ProviderRegistry', () => {

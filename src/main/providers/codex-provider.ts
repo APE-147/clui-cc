@@ -117,6 +117,19 @@ export class CodexProvider implements ProviderDefinition {
           usage: (event.usage || {}) as UsageData,
           sessionId: typeof event.thread_id === 'string' ? event.thread_id : '',
         }
+      case 'error': {
+        const message = typeof event.message === 'string' ? event.message : 'Codex request failed'
+        if (/^Reconnecting\.\.\./.test(message)) return null
+        return { type: 'error', message, isError: true }
+      }
+      case 'turn.failed': {
+        const message = typeof event.error?.message === 'string'
+          ? event.error.message
+          : typeof event.message === 'string'
+            ? event.message
+            : 'Codex request failed'
+        return { type: 'error', message, isError: true }
+      }
       case 'message':
         if (event.role !== 'assistant') return null
         return { type: 'text_chunk', text: contentToText(event.content) }

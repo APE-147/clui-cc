@@ -64,9 +64,29 @@ export function getDefaultModelForProvider(provider: ProviderId): string {
   return getModelsForProvider(provider)[0]?.id || DEFAULT_MODEL_ID
 }
 
+export function resolveCustomProviderModelAfterDiscovery(
+  currentModel: string | null | undefined,
+  discoveredModels: readonly ModelOption[],
+): string | null {
+  if (discoveredModels.length === 0) return null
+  const normalized = currentModel ? normalizeModelId(currentModel) : ''
+  if (normalized && discoveredModels.some((m) => m.id === normalized)) return normalized
+  return discoveredModels[0].id
+}
+
 export function resolveModelId(modelId: string | null | undefined, provider: ProviderId = DEFAULT_PROVIDER_ID): string {
   if (modelId && isKnownModelIdForProvider(modelId, provider)) return normalizeModelId(modelId)
   return getDefaultModelForProvider(provider)
+}
+
+export function resolveProviderModelForRun(
+  modelId: string | null | undefined,
+  provider: ProviderId = DEFAULT_PROVIDER_ID,
+  customProviderModels: readonly ModelOption[] = [],
+): string {
+  const resolved = resolveModelId(modelId, provider)
+  if (provider !== 'openai-direct') return resolved
+  return resolveCustomProviderModelAfterDiscovery(resolved, customProviderModels) || resolved
 }
 
 export function getModelDisplayLabel(modelId: string): string {

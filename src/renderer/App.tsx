@@ -188,6 +188,7 @@ export default function App() {
     contentWidth,
     cardExpandedWidth,
     cardCollapsedWidth,
+    cardCollapsedMargin,
     bodyMaxHeight,
     columnTransform,
   } = getScaledLayout({
@@ -196,7 +197,6 @@ export default function App() {
     widthScale: pillScale,
     uiScale,
   })
-  const cardCollapsedMargin = 15
 
   // Mutual exclusion: when settings opens, close history + marketplace + collapse chat
   useEffect(() => {
@@ -384,6 +384,7 @@ export default function App() {
             data-clui-ui
             className="overflow-hidden flex flex-col drag-region"
             animate={{
+              width: isExpanded ? cardExpandedWidth : cardCollapsedWidth,
               marginBottom: isExpanded ? 10 : -14,
               marginLeft: isExpanded ? 0 : cardCollapsedMargin,
               marginRight: isExpanded ? 0 : cardCollapsedMargin,
@@ -393,13 +394,11 @@ export default function App() {
             }}
             transition={TRANSITION}
             style={{
-              width: isExpanded ? cardExpandedWidth : cardCollapsedWidth,
               borderWidth: 1,
               borderStyle: 'solid',
               borderRadius: 20,
               position: 'relative',
               zIndex: isExpanded ? 20 : 10,
-              transition: 'width 0.08s linear',
             }}
           >
             {/* Tab strip — drag handle for the frameless window */}

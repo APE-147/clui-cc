@@ -29,14 +29,17 @@ export function getScaledLayout({
   const normalizedScale = normalizeUiScale(uiScale)
   const widthFactor = normalizedWidthScale / 100
   const visualScale = normalizedScale / 100
+  const cardExpandedWidth = Math.round((expandedUI ? 700 : 460) * widthFactor)
+  const cardCollapsedWidth = Math.round((expandedUI ? 670 : 430) * widthFactor)
 
   return {
     widthScale: normalizedWidthScale,
     uiScale: normalizedScale,
     visualScale,
     contentWidth: Math.round((expandedUI ? 700 : contentWidth) * widthFactor),
-    cardExpandedWidth: Math.round((expandedUI ? 700 : 460) * widthFactor),
-    cardCollapsedWidth: Math.round((expandedUI ? 670 : 430) * widthFactor),
+    cardExpandedWidth,
+    cardCollapsedWidth,
+    cardCollapsedMargin: (cardExpandedWidth - cardCollapsedWidth) / 2,
     bodyMaxHeight: expandedUI ? 520 : 400,
     columnTransform: `translateY(var(--clui-card-y, 0px)) scale(${visualScale})`,
   }

@@ -15,6 +15,17 @@ describe('input UI scaling', () => {
     expect(layout.columnTransform).toContain('scale(1.2)')
   })
 
+  it('keeps the collapsed and expanded chat shell on the same center line when width-scaled', () => {
+    const layout = getScaledLayout({
+      expandedUI: false,
+      contentWidth: 460,
+      widthScale: 110,
+      uiScale: 100,
+    })
+
+    expect(layout.cardCollapsedWidth + layout.cardCollapsedMargin * 2).toBe(layout.cardExpandedWidth)
+  })
+
   it('snaps whole-UI scale values to the old 100/110/120 percent scale steps', () => {
     expect(normalizeUiScale(103)).toBe(100)
     expect(normalizeUiScale(112)).toBe(110)

@@ -45,7 +45,10 @@ export class CodexProvider implements ProviderDefinition {
   supportsPermissions = false
 
   findBinary(): string | null {
+    const env = getCliEnv()
+    const nvmCodex = env.NVM_BIN ? join(env.NVM_BIN, 'codex') : null
     return findExecutable('codex', [
+      ...(nvmCodex ? [nvmCodex] : []),
       join(homedir(), '.local/bin/codex'),
       join(homedir(), 'Developer/bin/codex'),
       '/usr/local/bin/codex',

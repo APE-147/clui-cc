@@ -8,6 +8,7 @@ import {
   getModelsForProvider,
   isKnownModelId,
   isKnownModelIdForProvider,
+  resolveProviderForRun,
   resolveProviderModelForRun,
 } from '../models'
 import notificationSrc from '../../../resources/notification.mp3'
@@ -756,18 +757,23 @@ export const useSessionStore = create<State>((set, get) => ({
 
     // Send to backend — ControlPlane will queue if a run is active
     const theme = useThemeStore.getState()
+    const requestedModel = tab.modelOverride ?? theme.defaultModel
+    const provider = resolveProviderForRun(tab.provider, requestedModel, theme.customProviderModels)
     const model = resolveProviderModelForRun(
-      getEffectiveModel(tab, theme.defaultModel),
-      tab.provider,
+      requestedModel,
+      provider,
       theme.customProviderModels,
     )
+    const providerEndpoint = provider === 'openai-direct'
+      ? (tab.providerEndpoint || theme.providerEndpoint || undefined)
+      : undefined
     window.clui.prompt(activeTabId, requestId, {
       prompt: fullPrompt,
       projectPath: resolvedPath,
-      provider: tab.provider,
-      providerEndpoint: tab.providerEndpoint || undefined,
-      providerApiKey: tab.provider === 'openai-direct' ? theme.providerApiKey : undefined,
-      reasoningEffort: tab.provider === 'codex' || tab.provider === 'openai-direct' ? theme.codexReasoningEffort : undefined,
+      provider,
+      providerEndpoint,
+      providerApiKey: provider === 'openai-direct' ? theme.providerApiKey : undefined,
+      reasoningEffort: provider === 'codex' || provider === 'openai-direct' ? theme.codexReasoningEffort : undefined,
       sessionId: tab.claudeSessionId || undefined,
       model,
       addDirs: tab.additionalDirs.length > 0 ? tab.additionalDirs : undefined,

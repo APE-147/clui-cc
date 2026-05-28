@@ -6,6 +6,7 @@ import {
   resolveCustomProviderModelAfterDiscovery,
   resolveModelId,
   resolveProviderModelForRun,
+  resolveProviderForRun,
 } from '../models'
 
 describe('custom provider models', () => {
@@ -37,5 +38,16 @@ describe('custom provider models', () => {
 
     expect(resolveProviderModelForRun('gpt-4o', 'openai-direct', discovered)).toBe('gpt-5.5-fast')
     expect(resolveProviderModelForRun('claude-opus-4-6', 'claude', discovered)).toBe('claude-opus-4-6')
+  })
+
+  it('routes discovered custom-only models through the custom provider at run time', () => {
+    const discovered = [
+      { id: 'glm-5.1', label: 'glm-5.1' },
+      { id: 'gpt-5.5', label: 'gpt-5.5' },
+    ]
+
+    expect(resolveProviderForRun('codex', 'glm-5.1', discovered)).toBe('openai-direct')
+    expect(resolveProviderForRun('codex', 'gpt-5.5', discovered)).toBe('codex')
+    expect(resolveProviderForRun('claude', 'claude-opus-4-6', discovered)).toBe('claude')
   })
 })

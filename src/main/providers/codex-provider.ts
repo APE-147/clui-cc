@@ -62,11 +62,26 @@ export class CodexProvider implements ProviderDefinition {
     }
     args.push('-s', 'danger-full-access')
     args.push('--skip-git-repo-check')
-    if (options.providerEndpoint) {
+    if (options.providerApiKey) {
+      args.push('-c', 'model_provider="clui_custom"')
+      args.push('-c', 'model_providers.clui_custom.name="clui_custom"')
+      if (options.providerEndpoint) {
+        args.push('-c', `model_providers.clui_custom.base_url="${options.providerEndpoint}"`)
+      }
+      args.push('-c', 'model_providers.clui_custom.wire_api="responses"')
+      args.push('-c', 'model_providers.clui_custom.env_key="OPENAI_API_KEY"')
+      args.push('-c', 'model_providers.clui_custom.requires_openai_auth=false')
+    } else if (options.providerEndpoint) {
       args.push('-c', `model_providers.OpenAI.base_url="${options.providerEndpoint}"`)
     }
     args.push(options.prompt)
     return args
+  }
+
+  buildEnv(options: RunOptions, baseEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+    const env = { ...baseEnv }
+    if (options.providerApiKey) env.OPENAI_API_KEY = options.providerApiKey
+    return env
   }
 
   normalizeEvent(raw: unknown): NormalizedEvent | null {

@@ -3,7 +3,7 @@
  * Colors derived from ChatCN oklch system and design-fixed.html reference.
  */
 import { create } from 'zustand'
-import { DEFAULT_MODEL_ID, DEFAULT_PROVIDER_ID, isKnownModelId } from './models'
+import { DEFAULT_MODEL_ID, DEFAULT_PROVIDER_ID, isKnownModelId, type ModelOption } from './models'
 import { normalizeUiScale, normalizeWidthScale, type UiScalePercent } from './layout'
 import type { CliTerminalApp } from '../shared/types'
 import type { CodexReasoningEffort, ProviderId } from '../shared/provider-types'
@@ -321,6 +321,10 @@ interface ThemeState {
   defaultProvider: ProviderId
   /** Optional OpenAI-compatible endpoint used by Codex-backed providers */
   providerEndpoint: string
+  /** API key for the Custom OpenAI-compatible provider */
+  providerApiKey: string
+  /** Model list discovered from the Custom provider's /models endpoint */
+  customProviderModels: ModelOption[]
   /** Codex CLI model_reasoning_effort override */
   codexReasoningEffort: CodexReasoningEffort
   /** macOS app for "Open in CLI" */
@@ -337,6 +341,8 @@ interface ThemeState {
   setDefaultModel: (modelId: string) => void
   setDefaultProvider: (provider: ProviderId) => void
   setProviderEndpoint: (endpoint: string) => void
+  setProviderApiKey: (apiKey: string) => void
+  setCustomProviderModels: (models: ModelOption[]) => void
   setCodexReasoningEffort: (effort: CodexReasoningEffort) => void
   setCliTerminal: (app: CliTerminalApp) => void
   toggleSettings: () => void
@@ -374,12 +380,27 @@ type PersistedSettings = {
   defaultModel: string
   defaultProvider: ProviderId
   providerEndpoint: string
+  providerApiKey: string
+  customProviderModels: ModelOption[]
   codexReasoningEffort: CodexReasoningEffort
   cliTerminal: CliTerminalApp
 }
 
 function isProviderId(value: unknown): value is ProviderId {
   return value === 'claude' || value === 'codex' || value === 'openai-direct'
+}
+
+function normalizeModelOptions(value: unknown): ModelOption[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') return []
+    const id = String((item as { id?: unknown }).id || '').trim()
+    if (!id || seen.has(id)) return []
+    seen.add(id)
+    const label = String((item as { label?: unknown }).label || id).trim() || id
+    return [{ id, label }]
+  }).slice(0, 100)
 }
 
 function loadSettings(): PersistedSettings {
@@ -398,6 +419,8 @@ function loadSettings(): PersistedSettings {
         defaultModel: isKnownModelId(parsed.defaultModel) ? parsed.defaultModel : DEFAULT_MODEL_ID,
         defaultProvider: isProviderId(parsed.defaultProvider) ? parsed.defaultProvider : DEFAULT_PROVIDER_ID,
         providerEndpoint: typeof parsed.providerEndpoint === 'string' ? parsed.providerEndpoint : '',
+        providerApiKey: typeof parsed.providerApiKey === 'string' ? parsed.providerApiKey : '',
+        customProviderModels: normalizeModelOptions(parsed.customProviderModels),
         codexReasoningEffort: isCodexReasoningEffort(parsed.codexReasoningEffort) ? parsed.codexReasoningEffort : 'medium',
         cliTerminal: isCliTerminalApp(parsed.cliTerminal) ? parsed.cliTerminal : 'terminal',
       }
@@ -412,6 +435,8 @@ function loadSettings(): PersistedSettings {
     defaultModel: DEFAULT_MODEL_ID,
     defaultProvider: DEFAULT_PROVIDER_ID,
     providerEndpoint: '',
+    providerApiKey: '',
+    customProviderModels: [],
     codexReasoningEffort: 'medium',
     cliTerminal: 'terminal',
   }
@@ -431,6 +456,8 @@ function snapshotSettings(get: () => ThemeState): PersistedSettings {
     defaultModel: get().defaultModel,
     defaultProvider: get().defaultProvider,
     providerEndpoint: get().providerEndpoint,
+    providerApiKey: get().providerApiKey,
+    customProviderModels: get().customProviderModels,
     codexReasoningEffort: get().codexReasoningEffort,
     cliTerminal: get().cliTerminal,
   }
@@ -448,6 +475,8 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   defaultModel: saved.defaultModel,
   defaultProvider: saved.defaultProvider,
   providerEndpoint: saved.providerEndpoint,
+  providerApiKey: saved.providerApiKey,
+  customProviderModels: saved.customProviderModels,
   codexReasoningEffort: saved.codexReasoningEffort,
   cliTerminal: saved.cliTerminal,
   settingsOpen: false,
@@ -490,6 +519,14 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   },
   setProviderEndpoint: (endpoint) => {
     set({ providerEndpoint: endpoint.trim() })
+    saveSettings(snapshotSettings(get))
+  },
+  setProviderApiKey: (apiKey) => {
+    set({ providerApiKey: apiKey.trim() })
+    saveSettings(snapshotSettings(get))
+  },
+  setCustomProviderModels: (models) => {
+    set({ customProviderModels: normalizeModelOptions(models) })
     saveSettings(snapshotSettings(get))
   },
   setCodexReasoningEffort: (effort) => {

@@ -55,16 +55,17 @@ export class RunManager extends EventEmitter {
     log(`Providers registered: ${providerRegistry.listAll().map((p) => p.id).join(', ')}`)
   }
 
-  private _getEnv(binary: string): NodeJS.ProcessEnv {
+  private _getEnv(binary: string, options: RunOptions): NodeJS.ProcessEnv {
+    const provider = providerRegistry.resolve(options)
     const env = getCliEnv()
-    if (!isAbsolute(binary)) return env
-
-    const binDir = dirname(binary)
-    if (env.PATH && !env.PATH.split(':').includes(binDir)) {
-      env.PATH = `${binDir}:${env.PATH}`
+    if (isAbsolute(binary)) {
+      const binDir = dirname(binary)
+      if (env.PATH && !env.PATH.split(':').includes(binDir)) {
+        env.PATH = `${binDir}:${env.PATH}`
+      }
     }
 
-    return env
+    return provider.buildEnv ? provider.buildEnv(options, env) : env
   }
 
   startRun(requestId: string, options: RunOptions): RunHandle {
@@ -88,7 +89,7 @@ export class RunManager extends EventEmitter {
     const child = spawn(binary, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       cwd,
-      env: this._getEnv(binary),
+      env: this._getEnv(binary, options),
     })
 
     log(`Spawned PID: ${child.pid}`)

@@ -761,6 +761,7 @@ export const useSessionStore = create<State>((set, get) => ({
       projectPath: resolvedPath,
       provider: tab.provider,
       providerEndpoint: tab.providerEndpoint || undefined,
+      providerApiKey: tab.provider === 'openai-direct' ? theme.providerApiKey : undefined,
       reasoningEffort: tab.provider === 'codex' || tab.provider === 'openai-direct' ? theme.codexReasoningEffort : undefined,
       sessionId: tab.claudeSessionId || undefined,
       model,

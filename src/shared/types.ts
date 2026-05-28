@@ -219,6 +219,7 @@ export interface RunOptions {
   projectPath: string
   provider?: ProviderId
   providerEndpoint?: string
+  providerApiKey?: string
   providerApiKeyEnvVar?: string
   reasoningEffort?: CodexReasoningEffort
   sessionId?: string
@@ -337,6 +338,7 @@ export const IPC = {
   GET_SESSION_MODEL: 'clui:get-session-model',
   SET_SESSION_MODEL: 'clui:set-session-model',
   LIST_PROVIDERS: 'clui:list-providers',
+  LIST_CUSTOM_PROVIDER_MODELS: 'clui:list-custom-provider-models',
 
   // One-way events (main → renderer)
   TEXT_CHUNK: 'clui:text-chunk',

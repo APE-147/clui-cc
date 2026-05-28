@@ -11,6 +11,7 @@ import { useColors, useThemeStore } from '../theme'
 function ModelPicker() {
   const defaultModel = useThemeStore((s) => s.defaultModel)
   const defaultProvider = useThemeStore((s) => s.defaultProvider)
+  const customProviderModels = useThemeStore((s) => s.customProviderModels)
   const setTabModel = useSessionStore((s) => s.setTabModel)
   const tab = useSessionStore(
     (s) => s.tabs.find((t) => t.id === s.activeTabId),
@@ -55,7 +56,9 @@ function ModelPicker() {
 
   const effectiveModel = tab ? getEffectiveModel(tab, defaultModel) : defaultModel
   const activeProvider = tab?.provider ?? defaultProvider
-  const models = getModelsForProvider(activeProvider)
+  const models = activeProvider === 'openai-direct' && customProviderModels.length > 0
+    ? customProviderModels
+    : getModelsForProvider(activeProvider)
   const activeLabel = (() => {
     const m = models.find((item) => item.id === effectiveModel)
     return m?.label || getModelDisplayLabel(effectiveModel)

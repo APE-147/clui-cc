@@ -42,6 +42,7 @@ export function InputBar() {
   const staticInfo = useSessionStore((s) => s.staticInfo)
   const defaultModel = useThemeStore((s) => s.defaultModel)
   const defaultProvider = useThemeStore((s) => s.defaultProvider)
+  const customProviderModels = useThemeStore((s) => s.customProviderModels)
   const activeTabId = useSessionStore((s) => s.activeTabId)
   const tab = useSessionStore((s) => s.tabs.find((t) => t.id === s.activeTabId))
   const colors = useColors()
@@ -184,7 +185,9 @@ export function InputBar() {
         const current = tab ? getEffectiveModel(tab, defaultModel) : defaultModel
         const scope = tab?.modelOverride ? 'this session' : 'default (settings)'
         const provider = tab?.provider ?? defaultProvider
-        const models = getModelsForProvider(provider)
+        const models = provider === 'openai-direct' && customProviderModels.length > 0
+          ? customProviderModels
+          : getModelsForProvider(provider)
         const lines = models.map((m) => {
           const active = m.id === current
           return `  ${active ? '\u25CF' : '\u25CB'} ${m.label} (${m.id})`
@@ -232,7 +235,7 @@ export function InputBar() {
         break
       }
     }
-  }, [tab, clearTab, addSystemMessage, staticInfo, defaultModel, defaultProvider])
+  }, [tab, clearTab, addSystemMessage, staticInfo, defaultModel, defaultProvider, customProviderModels])
 
   const handleSlashSelect = useCallback((cmd: SlashCommand) => {
     const isSkillCommand = !!tab?.sessionSkills?.includes(cmd.command.replace(/^\//, ''))
@@ -260,7 +263,9 @@ export function InputBar() {
     const modelMatch = prompt.match(/^\/model\s+(\S+)/i)
     if (modelMatch) {
       const provider = tab?.provider ?? defaultProvider
-      const models = getModelsForProvider(provider)
+      const models = provider === 'openai-direct' && customProviderModels.length > 0
+        ? customProviderModels
+        : getModelsForProvider(provider)
       const requestedModel = modelMatch[1].trim()
       const query = requestedModel.toLowerCase()
       const match = models.find((m: { id: string; label: string }) =>
@@ -293,7 +298,7 @@ export function InputBar() {
     sendMessage(prompt || 'See attached files')
     // Refocus after React re-renders from the state update
     requestAnimationFrame(() => textareaRef.current?.focus())
-  }, [input, isBusy, sendMessage, attachments.length, showSlashMenu, slashFilter, slashIndex, handleSlashSelect, tab, defaultProvider, setTabModel, addSystemMessage])
+  }, [input, isBusy, sendMessage, attachments.length, showSlashMenu, slashFilter, slashIndex, handleSlashSelect, tab, defaultProvider, customProviderModels, setTabModel, addSystemMessage])
 
   // ─── Keyboard ───
   const handleKeyDown = (e: React.KeyboardEvent) => {

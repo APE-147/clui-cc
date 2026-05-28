@@ -72,6 +72,31 @@ describe('CodexProvider', () => {
     expect(args).toContain('model_reasoning_effort="xhigh"')
   })
 
+  it('injects a custom provider API key through the environment', () => {
+    const provider = new CodexProvider()
+    const env = provider.buildEnv?.({
+      prompt: 'think',
+      projectPath: '/tmp/project',
+      model: 'llama-3.3-70b',
+      provider: 'openai-direct',
+      providerApiKey: 'sk-test',
+    }, { PATH: '/usr/bin' })
+
+    const args = provider.buildArgs({
+      prompt: 'think',
+      projectPath: '/tmp/project',
+      model: 'llama-3.3-70b',
+      provider: 'openai-direct',
+      providerApiKey: 'sk-test',
+    })
+
+    expect(env?.OPENAI_API_KEY).toBe('sk-test')
+    expect(args).toContain('model_provider="clui_custom"')
+    expect(args).toContain('model_providers.clui_custom.name="clui_custom"')
+    expect(args).toContain('model_providers.clui_custom.env_key="OPENAI_API_KEY"')
+    expect(args).toContain('model_providers.clui_custom.requires_openai_auth=false')
+  })
+
   it('normalizes Codex JSONL events into CLUI events', () => {
     const provider = new CodexProvider()
 

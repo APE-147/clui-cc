@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { DotsThree, Bell, ArrowsOutSimple, ArrowsHorizontal, Moon, Robot, Terminal, CaretDown, Check } from '@phosphor-icons/react'
+import { DotsThree, Bell, ArrowsOutSimple, ArrowsHorizontal, Moon, Robot, Terminal, CaretDown, Check, Key, ArrowsClockwise } from '@phosphor-icons/react'
 import { CLI_TERMINAL_OPTIONS, CODEX_REASONING_EFFORT_OPTIONS, useColors, useThemeStore } from '../theme'
 import { getEffectiveModel, getModelDisplayLabel, getModelsForProvider, useSessionStore } from '../stores/sessionStore'
 import { getDefaultModelForProvider, resolveModelId } from '../models'
@@ -163,6 +163,10 @@ export function SettingsContent() {
   const setDefaultProvider = useThemeStore((s) => s.setDefaultProvider)
   const providerEndpoint = useThemeStore((s) => s.providerEndpoint)
   const setProviderEndpoint = useThemeStore((s) => s.setProviderEndpoint)
+  const providerApiKey = useThemeStore((s) => s.providerApiKey)
+  const setProviderApiKey = useThemeStore((s) => s.setProviderApiKey)
+  const customProviderModels = useThemeStore((s) => s.customProviderModels)
+  const setCustomProviderModels = useThemeStore((s) => s.setCustomProviderModels)
   const codexReasoningEffort = useThemeStore((s) => s.codexReasoningEffort)
   const setCodexReasoningEffort = useThemeStore((s) => s.setCodexReasoningEffort)
   const cliTerminal = useThemeStore((s) => s.cliTerminal)
@@ -182,7 +186,10 @@ export function SettingsContent() {
   const activeProvider = activeTab?.provider ?? defaultProvider
   const activeEndpoint = activeTab?.providerEndpoint ?? providerEndpoint
   const [endpointDraft, setEndpointDraft] = useState(activeEndpoint || '')
+  const [apiKeyDraft, setApiKeyDraft] = useState(providerApiKey)
   const [customModelDraft, setCustomModelDraft] = useState('')
+  const [modelDiscoveryStatus, setModelDiscoveryStatus] = useState<'idle' | 'loading' | 'error'>('idle')
+  const [modelDiscoveryError, setModelDiscoveryError] = useState('')
   const codexAvailable = providers.some((p) => p.id === 'codex' && p.available)
   const providerMode: ProviderMode =
     activeProvider === 'openai-direct'
@@ -201,12 +208,18 @@ export function SettingsContent() {
         ]
       : []),
   ]
-  const visibleModels = getModelsForProvider(activeProvider)
+  const visibleModels = isCustomProvider && customProviderModels.length > 0
+    ? customProviderModels
+    : getModelsForProvider(activeProvider)
   const selectedModel = activeTab
     ? getEffectiveModel(activeTab, defaultModel)
     : resolveModelId(defaultModel, defaultProvider)
   const endpointIsValid = isValidEndpoint(endpointDraft)
   const customModelIsValid = customModelDraft.trim().length > 0
+  const canRefreshCustomModels = isCustomProvider
+    && endpointDraft.trim().length > 0
+    && endpointIsValid
+    && modelDiscoveryStatus !== 'loading'
 
   useEffect(() => {
     window.clui.listProviders()
@@ -238,6 +251,10 @@ export function SettingsContent() {
   }, [activeEndpoint])
 
   useEffect(() => {
+    setApiKeyDraft(providerApiKey)
+  }, [providerApiKey])
+
+  useEffect(() => {
     setCustomModelDraft(selectedModel)
   }, [selectedModel])
 
@@ -261,6 +278,29 @@ export function SettingsContent() {
     const endpoint = endpointDraft.trim()
     setProviderEndpoint(endpoint)
     if (activeTab) setTabProviderEndpoint(endpoint || null)
+  }
+
+  const applyApiKey = () => {
+    setProviderApiKey(apiKeyDraft)
+  }
+
+  const refreshCustomModels = async () => {
+    if (!canRefreshCustomModels) return
+    const endpoint = endpointDraft.trim()
+    const apiKey = apiKeyDraft.trim()
+    setProviderEndpoint(endpoint)
+    setProviderApiKey(apiKey)
+    if (activeTab) setTabProviderEndpoint(endpoint || null)
+    setModelDiscoveryStatus('loading')
+    setModelDiscoveryError('')
+    const result = await window.clui.listCustomProviderModels({ baseUrl: endpoint, apiKey })
+    if (result.error) {
+      setModelDiscoveryStatus('error')
+      setModelDiscoveryError(result.error)
+      return
+    }
+    setCustomProviderModels(result.models)
+    setModelDiscoveryStatus('idle')
   }
 
   const applyCustomModel = () => {
@@ -332,24 +372,77 @@ export function SettingsContent() {
           </div>
         )}
         {isCustomProvider && (
-          <input
-            value={endpointDraft}
-            onChange={(e) => setEndpointDraft(e.target.value)}
-            onBlur={applyEndpoint}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                applyEndpoint()
-                ;(e.currentTarget as HTMLInputElement).blur()
-              }
-            }}
-            placeholder="OpenAI-compatible base URL"
-            className="w-full mt-2 rounded-md px-2 py-1.5 text-[11px] outline-none"
-            style={{
-              color: colors.textSecondary,
-              background: colors.surfacePrimary,
-              border: `1px solid ${endpointIsValid ? colors.containerBorder : colors.statusError}`,
-            }}
-          />
+          <>
+            <input
+              value={endpointDraft}
+              onChange={(e) => setEndpointDraft(e.target.value)}
+              onBlur={applyEndpoint}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  applyEndpoint()
+                  ;(e.currentTarget as HTMLInputElement).blur()
+                }
+              }}
+              placeholder="OpenAI-compatible base URL"
+              className="w-full mt-2 rounded-md px-2 py-1.5 text-[11px] outline-none"
+              style={{
+                color: colors.textSecondary,
+                background: colors.surfacePrimary,
+                border: `1px solid ${endpointIsValid ? colors.containerBorder : colors.statusError}`,
+              }}
+            />
+            <div className="mt-2 flex items-center gap-1.5">
+              <div className="relative flex-1 min-w-0">
+                <Key
+                  size={12}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none"
+                  style={{ color: colors.textTertiary }}
+                />
+                <input
+                  type="password"
+                  value={apiKeyDraft}
+                  onChange={(e) => setApiKeyDraft(e.target.value)}
+                  onBlur={applyApiKey}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      void refreshCustomModels()
+                      ;(e.currentTarget as HTMLInputElement).blur()
+                    }
+                  }}
+                  placeholder="API key"
+                  className="w-full rounded-md py-1.5 pr-2 pl-7 text-[11px] outline-none"
+                  style={{
+                    color: colors.textSecondary,
+                    background: colors.surfacePrimary,
+                    border: `1px solid ${colors.containerBorder}`,
+                  }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void refreshCustomModels()}
+                disabled={!canRefreshCustomModels}
+                title="Refresh models"
+                className="w-7 h-7 rounded-md flex items-center justify-center transition-colors"
+                style={{
+                  color: canRefreshCustomModels ? colors.textSecondary : colors.textTertiary,
+                  background: colors.surfacePrimary,
+                  border: `1px solid ${colors.containerBorder}`,
+                  opacity: canRefreshCustomModels ? 1 : 0.55,
+                }}
+              >
+                <ArrowsClockwise
+                  size={13}
+                  className={modelDiscoveryStatus === 'loading' ? 'animate-spin' : ''}
+                />
+              </button>
+            </div>
+            {modelDiscoveryStatus === 'error' && (
+              <div className="mt-1 text-[10px]" style={{ color: colors.statusError }}>
+                {modelDiscoveryError}
+              </div>
+            )}
+          </>
         )}
         {isCodexBackedProvider && (
           <>

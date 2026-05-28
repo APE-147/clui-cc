@@ -62,10 +62,11 @@ export class ProcessManager extends EventEmitter {
     log(`Starting run ${runId}: ${binary} ${args.join(' ')}`)
     log(`Prompt: ${options.prompt.substring(0, 200)}`)
 
+    const env = provider.buildEnv ? provider.buildEnv(options, this.getEnv(binary)) : this.getEnv(binary)
     const child = spawn(binary, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       cwd,
-      env: this.getEnv(binary),
+      env,
     })
 
     log(`Spawned PID: ${child.pid}`)

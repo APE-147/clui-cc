@@ -18,12 +18,29 @@ export interface ProviderDefinition {
   findBinary(): string | null
   /** Builds provider-specific CLI arguments from a normalized run request. */
   buildArgs(options: RunOptions): string[]
+  /** Adds provider-specific environment variables without exposing secrets in args. */
+  buildEnv?(options: RunOptions, baseEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv
   /** Converts one raw provider JSON event into CLUI's canonical event shape. */
   normalizeEvent(raw: unknown): NormalizedEvent | null
   /** True when the provider supports continuing a prior session id. */
   supportsResume: boolean
   /** True when the provider supports CLUI's permission hook workflow. */
   supportsPermissions: boolean
+}
+
+export interface CustomProviderModelOption {
+  id: string
+  label: string
+}
+
+export interface CustomProviderModelsRequest {
+  baseUrl: string
+  apiKey?: string
+}
+
+export interface CustomProviderModelsResult {
+  models: CustomProviderModelOption[]
+  error: string | null
 }
 
 export interface ProviderInfo {

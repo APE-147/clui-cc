@@ -444,6 +444,86 @@ export function SettingsContent() {
             )}
           </>
         )}
+        <div className="mt-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Robot size={14} style={{ color: colors.textTertiary }} />
+              <div className="text-[12px] font-medium" style={{ color: colors.textPrimary }}>
+                Default model
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setModelMenuOpen((o) => !o)
+                setProviderMenuOpen(false)
+                setReasoningMenuOpen(false)
+                setCliMenuOpen(false)
+              }}
+              className="flex items-center gap-0.5 text-[11px] rounded-full px-2 py-0.5 transition-colors"
+              style={{ color: colors.textSecondary, border: `1px solid ${colors.containerBorder}` }}
+              aria-expanded={modelMenuOpen}
+              aria-haspopup="listbox"
+            >
+              {getModelDisplayLabel(selectedModel)}
+              <CaretDown size={10} style={{ opacity: 0.6 }} />
+            </button>
+          </div>
+          {modelMenuOpen && (
+            <div
+              className="mt-2 rounded-lg overflow-hidden"
+              style={{ border: `1px solid ${colors.popoverBorder}` }}
+              role="listbox"
+            >
+              {visibleModels.map((m) => {
+                const isSelected = selectedModel === m.id
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => {
+                      setDefaultModel(m.id)
+                      if (activeTab) setTabModel(m.id)
+                      setCustomModelDraft(m.id)
+                      setModelMenuOpen(false)
+                    }}
+                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-[11px] transition-colors"
+                    style={{
+                      color: isSelected ? colors.textPrimary : colors.textSecondary,
+                      fontWeight: isSelected ? 600 : 400,
+                      background: isSelected ? colors.surfaceSecondary : 'transparent',
+                    }}
+                  >
+                    {m.label}
+                    {isSelected && <Check size={12} style={{ color: colors.accent }} />}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          {isCustomProvider && (
+            <input
+              value={customModelDraft}
+              onChange={(e) => setCustomModelDraft(e.target.value)}
+              onBlur={applyCustomModel}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  applyCustomModel()
+                  ;(e.currentTarget as HTMLInputElement).blur()
+                }
+              }}
+              placeholder="Custom model id"
+              className="w-full mt-2 rounded-md px-2 py-1.5 text-[11px] outline-none"
+              style={{
+                color: colors.textSecondary,
+                background: colors.surfacePrimary,
+                border: `1px solid ${customModelIsValid ? colors.containerBorder : colors.statusError}`,
+              }}
+            />
+          )}
+        </div>
         {isCodexBackedProvider && (
           <>
             <div className="mt-2">
@@ -563,89 +643,6 @@ export function SettingsContent() {
             label="Toggle dark theme"
           />
         </div>
-      </div>
-
-      <div style={{ height: 1, background: colors.popoverBorder }} />
-
-      <div>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Robot size={14} style={{ color: colors.textTertiary }} />
-            <div className="text-[12px] font-medium" style={{ color: colors.textPrimary }}>
-              Default model
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setModelMenuOpen((o) => !o)
-              setProviderMenuOpen(false)
-              setReasoningMenuOpen(false)
-              setCliMenuOpen(false)
-            }}
-            className="flex items-center gap-0.5 text-[11px] rounded-full px-2 py-0.5 transition-colors"
-            style={{ color: colors.textSecondary, border: `1px solid ${colors.containerBorder}` }}
-            aria-expanded={modelMenuOpen}
-            aria-haspopup="listbox"
-          >
-            {getModelDisplayLabel(selectedModel)}
-            <CaretDown size={10} style={{ opacity: 0.6 }} />
-          </button>
-        </div>
-        {modelMenuOpen && (
-          <div
-            className="mt-2 rounded-lg overflow-hidden"
-            style={{ border: `1px solid ${colors.popoverBorder}` }}
-            role="listbox"
-          >
-            {visibleModels.map((m) => {
-              const isSelected = selectedModel === m.id
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  onClick={() => {
-                    setDefaultModel(m.id)
-                    if (activeTab) setTabModel(m.id)
-                    setCustomModelDraft(m.id)
-                    setModelMenuOpen(false)
-                  }}
-                  className="w-full flex items-center justify-between px-2.5 py-1.5 text-[11px] transition-colors"
-                  style={{
-                    color: isSelected ? colors.textPrimary : colors.textSecondary,
-                    fontWeight: isSelected ? 600 : 400,
-                    background: isSelected ? colors.surfaceSecondary : 'transparent',
-                  }}
-                >
-                  {m.label}
-                  {isSelected && <Check size={12} style={{ color: colors.accent }} />}
-                </button>
-              )
-            })}
-          </div>
-        )}
-        {isCustomProvider && (
-          <input
-            value={customModelDraft}
-            onChange={(e) => setCustomModelDraft(e.target.value)}
-            onBlur={applyCustomModel}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                applyCustomModel()
-                ;(e.currentTarget as HTMLInputElement).blur()
-              }
-            }}
-            placeholder="Custom model id"
-            className="w-full mt-2 rounded-md px-2 py-1.5 text-[11px] outline-none"
-            style={{
-              color: colors.textSecondary,
-              background: colors.surfacePrimary,
-              border: `1px solid ${customModelIsValid ? colors.containerBorder : colors.statusError}`,
-            }}
-          />
-        )}
       </div>
 
       <div style={{ height: 1, background: colors.popoverBorder }} />

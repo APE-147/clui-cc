@@ -109,9 +109,23 @@ describe('CodexProvider', () => {
     })
 
     expect(args).toContain('model_provider="clui_custom"')
+    expect(args).toContain('--ignore-user-config')
     expect(args).toContain('model_providers.clui_custom.base_url="https://cliproxyapi.taild5cfc2.ts.net/v1"')
     expect(args).toContain('model_providers.clui_custom.requires_openai_auth=false')
     expect(args).not.toContain('model_providers.OpenAI.base_url="https://cliproxyapi.taild5cfc2.ts.net/v1"')
+  })
+
+  it('keeps native Codex runs on the user config path', () => {
+    const provider = new CodexProvider()
+
+    const args = provider.buildArgs({
+      prompt: 'think',
+      projectPath: '/tmp/project',
+      model: 'gpt-5.5',
+      provider: 'codex',
+    })
+
+    expect(args).not.toContain('--ignore-user-config')
   })
 
   it('normalizes Codex JSONL events into CLUI events', () => {

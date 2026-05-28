@@ -10,10 +10,10 @@ import { fetchCatalog, listInstalled, installPlugin, uninstallPlugin } from './m
 import { providerRegistry } from './providers/registry'
 import { fetchOpenAiCompatibleModels } from './providers/custom-provider-models'
 import { log as _log, LOG_FILE, flushLogs } from './logger'
-import { getCliEnv } from './cli-env'
 import { IPC } from '../shared/types'
 import { getSessionModel, setSessionModel } from './session-models'
 import { buildCliCommand, buildOpenTerminalAppleScript } from './open-terminal'
+import { getStaticCliInfo } from './static-cli-info'
 import type { CliTerminalApp } from '../shared/types'
 import type { RunOptions, NormalizedEvent, EnrichedError } from '../shared/types'
 
@@ -423,26 +423,7 @@ ipcMain.on(IPC.RESET_WINDOW_POSITION, () => {
 
 ipcMain.handle(IPC.START, async () => {
   log('IPC START — fetching static CLI info')
-  const { execSync } = require('child_process')
-
-  let version = 'unknown'
-  try {
-    version = execSync('claude -v', { encoding: 'utf-8', timeout: 5000, env: getCliEnv() }).trim()
-  } catch {}
-
-  let auth: { email?: string; subscriptionType?: string; authMethod?: string } = {}
-  try {
-    const raw = execSync('claude auth status', { encoding: 'utf-8', timeout: 5000, env: getCliEnv() }).trim()
-    auth = JSON.parse(raw)
-  } catch {}
-
-  let mcpServers: string[] = []
-  try {
-    const raw = execSync('claude mcp list', { encoding: 'utf-8', timeout: 5000, env: getCliEnv() }).trim()
-    if (raw) mcpServers = raw.split('\n').filter(Boolean)
-  } catch {}
-
-  return { version, auth, mcpServers, projectPath: process.cwd(), homePath: require('os').homedir() }
+  return getStaticCliInfo()
 })
 
 ipcMain.handle(IPC.CREATE_TAB, () => {

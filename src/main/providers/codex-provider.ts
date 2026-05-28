@@ -62,7 +62,7 @@ export class CodexProvider implements ProviderDefinition {
     }
     args.push('-s', 'danger-full-access')
     args.push('--skip-git-repo-check')
-    if (options.providerApiKey) {
+    if (options.provider === 'openai-direct') {
       args.push('-c', 'model_provider="clui_custom"')
       args.push('-c', 'model_providers.clui_custom.name="clui_custom"')
       if (options.providerEndpoint) {

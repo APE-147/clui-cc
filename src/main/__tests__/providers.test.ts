@@ -97,6 +97,23 @@ describe('CodexProvider', () => {
     expect(args).toContain('model_providers.clui_custom.requires_openai_auth=false')
   })
 
+  it('keeps custom provider runs off built-in OpenAI auth even when the key is unavailable', () => {
+    const provider = new CodexProvider()
+
+    const args = provider.buildArgs({
+      prompt: 'think',
+      projectPath: '/tmp/project',
+      model: 'gpt-5.5-fast',
+      provider: 'openai-direct',
+      providerEndpoint: 'https://cliproxyapi.taild5cfc2.ts.net/v1',
+    })
+
+    expect(args).toContain('model_provider="clui_custom"')
+    expect(args).toContain('model_providers.clui_custom.base_url="https://cliproxyapi.taild5cfc2.ts.net/v1"')
+    expect(args).toContain('model_providers.clui_custom.requires_openai_auth=false')
+    expect(args).not.toContain('model_providers.OpenAI.base_url="https://cliproxyapi.taild5cfc2.ts.net/v1"')
+  })
+
   it('normalizes Codex JSONL events into CLUI events', () => {
     const provider = new CodexProvider()
 
